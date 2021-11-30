@@ -1,0 +1,15 @@
+stm32l475e_iot01_motion_sensors.c:79:9:BSP_MOTION_SENSOR_Init	24	static
+stm32l475e_iot01_motion_sensors.c:127:9:BSP_MOTION_SENSOR_DeInit	24	static
+stm32l475e_iot01_motion_sensors.c:160:9:BSP_MOTION_SENSOR_GetCapabilities	24	static
+stm32l475e_iot01_motion_sensors.c:189:9:BSP_MOTION_SENSOR_ReadID	24	static
+stm32l475e_iot01_motion_sensors.c:221:9:BSP_MOTION_SENSOR_Enable	24	static
+stm32l475e_iot01_motion_sensors.c:263:9:BSP_MOTION_SENSOR_Disable	24	static
+stm32l475e_iot01_motion_sensors.c:306:9:BSP_MOTION_SENSOR_GetAxes	32	static
+stm32l475e_iot01_motion_sensors.c:349:9:BSP_MOTION_SENSOR_GetAxesRaw	32	static
+stm32l475e_iot01_motion_sensors.c:392:9:BSP_MOTION_SENSOR_GetSensitivity	32	static
+stm32l475e_iot01_motion_sensors.c:435:9:BSP_MOTION_SENSOR_GetOutputDataRate	32	static
+stm32l475e_iot01_motion_sensors.c:478:9:BSP_MOTION_SENSOR_SetOutputDataRate	32	static
+stm32l475e_iot01_motion_sensors.c:521:9:BSP_MOTION_SENSOR_GetFullScale	32	static
+stm32l475e_iot01_motion_sensors.c:564:9:BSP_MOTION_SENSOR_SetFullScale	32	static
+stm32l475e_iot01_motion_sensors.c:610:16:LSM6DSL_Probe	56	static
+stm32l475e_iot01_motion_sensors.c:668:16:LIS3MDL_Probe	56	static

@@ -1,0 +1,17 @@
+m24sr_wrapper.c:86:10:NFC_TT4_Initialization	24	static
+m24sr_wrapper.c:149:10:NFC_TT4_GetNDEFFileId	16	static
+m24sr_wrapper.c:171:10:NFC_TT4_OpenNDEFSession	24	static
+m24sr_wrapper.c:236:10:NFC_TT4_CloseNDEFSession	24	static
+m24sr_wrapper.c:267:10:NFC_TT4_ReadData	24	static
+m24sr_wrapper.c:296:10:NFC_TT4_ForceReadData	24	static
+m24sr_wrapper.c:325:10:NFC_TT4_WriteData	24	static
+m24sr_wrapper.c:354:10:NFC_TT4_EnableReadPassword	24	static
+m24sr_wrapper.c:380:10:NFC_TT4_DisableReadPassword	24	static
+m24sr_wrapper.c:406:10:NFC_TT4_EnableWritePassword	24	static
+m24sr_wrapper.c:432:10:NFC_TT4_DisableWritePassword	24	static
+m24sr_wrapper.c:456:10:NFC_TT4_DisableAllPassword	24	static
+m24sr_wrapper.c:488:10:NFC_TT4_EnableReadOnly	24	static
+m24sr_wrapper.c:512:10:NFC_TT4_DisableReadOnly	24	static
+m24sr_wrapper.c:537:10:NFC_TT4_EnableWriteOnly	24	static
+m24sr_wrapper.c:561:10:NFC_TT4_DisableWriteOnly	24	static
+m24sr_wrapper.c:586:10:NFC_TT4_ManageGPO	24	static

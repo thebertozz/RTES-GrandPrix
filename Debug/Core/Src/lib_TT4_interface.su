@@ -1,0 +1,5 @@
+lib_TT4_interface.c:75:10:TT4_Init	32	static
+lib_TT4_interface.c:108:10:TT4_ReadNDEF	24	static
+lib_TT4_interface.c:130:10:TT4_WriteNDEF	24	static
+lib_TT4_interface.c:152:10:TT4_ReadURI	32	static
+lib_TT4_interface.c:180:10:TT4_WriteURI	24	static

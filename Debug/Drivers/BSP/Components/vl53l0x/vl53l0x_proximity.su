@@ -1,0 +1,4 @@
+vl53l0x_proximity.c:52:6:VL53L0X_PROXIMITY_Init	112	static
+vl53l0x_proximity.c:91:10:VL53L0X_PROXIMITY_GetDistance	40	static
+vl53l0x_proximity.c:103:6:VL53L0X_PROXIMITY_MspInit	32	static
+vl53l0x_proximity.c:122:6:SetupSingleShot	48	static
