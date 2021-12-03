@@ -1,3 +1,4 @@
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file    stm32l4xx_hal_conf.h
@@ -8,16 +9,16 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
+/* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef STM32L4xx_HAL_CONF_H
@@ -44,7 +45,7 @@
 /*#define HAL_DAC_MODULE_ENABLED   */
 /*#define HAL_DCMI_MODULE_ENABLED   */
 /*#define HAL_DMA2D_MODULE_ENABLED   */
-#define HAL_DFSDM_MODULE_ENABLED
+/*#define HAL_DFSDM_MODULE_ENABLED   */
 /*#define HAL_DSI_MODULE_ENABLED   */
 /*#define HAL_FIREWALL_MODULE_ENABLED   */
 /*#define HAL_GFXMMU_MODULE_ENABLED   */
@@ -62,10 +63,10 @@
 /*#define HAL_OPAMP_MODULE_ENABLED   */
 /*#define HAL_OSPI_MODULE_ENABLED   */
 /*#define HAL_OSPI_MODULE_ENABLED   */
-#define HAL_PCD_MODULE_ENABLED
+/*#define HAL_PCD_MODULE_ENABLED   */
 /*#define HAL_PKA_MODULE_ENABLED   */
 /*#define HAL_QSPI_MODULE_ENABLED   */
-#define HAL_QSPI_MODULE_ENABLED
+/*#define HAL_QSPI_MODULE_ENABLED   */
 /*#define HAL_RNG_MODULE_ENABLED   */
 /*#define HAL_RTC_MODULE_ENABLED   */
 /*#define HAL_SAI_MODULE_ENABLED   */
@@ -479,5 +480,3 @@
 #endif
 
 #endif /* STM32L4xx_HAL_CONF_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

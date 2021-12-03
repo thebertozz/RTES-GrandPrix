@@ -50,26 +50,18 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-DFSDM_Channel_HandleTypeDef hdfsdm1_channel1;
-
 I2C_HandleTypeDef hi2c2;
-
-QSPI_HandleTypeDef hqspi;
 
 SPI_HandleTypeDef hspi3;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
 
-PCD_HandleTypeDef hpcd_USB_OTG_FS;
-
 osThreadId defaultTaskHandle;
-osThreadId tempSensorTaskHandle;
-osThreadId serialLogTaskHandle;
-osThreadId humiditySensorTHandle;
-osThreadId pressureSensorTHandle;
-osThreadId nfcTagTaskHandle;
+osThreadId serialPrintTaskHandle;
 osThreadId userButtonTaskHandle;
+osThreadId environmentalSensorsTaskHandle;
+osThreadId gyroscopeTaskHandle;
 /* USER CODE BEGIN PV */
 
 struct sensors_t {
@@ -77,8 +69,8 @@ struct sensors_t {
 	float temperature_value;  // Shared measured temperature value
 	float humidity_value; // Shared measured humidity value
 	float pressure_value;  // Shared measured pressure value
-	BSP_MOTION_SENSOR_Axes_t  acc_value; //Shared accelerometer value
-	BSP_MOTION_SENSOR_Axes_t  gyr_value; //Shared gyroscope value
+	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
+	BSP_MOTION_SENSOR_Axes_t  gyroscope_value; //Shared gyroscope value
 	uint16_t proximity; //Shared proximity value
 
 } sensors;
@@ -113,20 +105,15 @@ int isReadingActivated = 0;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DFSDM1_Init(void);
 static void MX_I2C2_Init(void);
-static void MX_QUADSPI_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_USB_OTG_FS_PCD_Init(void);
 void StartDefaultTask(void const * argument);
-void startTempSensorTask(void const * argument);
-void startSerialLogTask(void const * argument);
-void startHumiditySensorTask(void const * argument);
-void startPressureSensorTask(void const * argument);
-void startNfcTagTask(void const * argument);
+void startSerialPrintTask(void const * argument);
 void startUserButtonTask(void const * argument);
+void startEnvironmentalSensorsTask(void const * argument);
+void startGyroscopeTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -138,6 +125,94 @@ int _write(int file, char *ptr, int len)
 {
 HAL_UART_Transmit(&huart1,(uint8_t *)ptr,len,10);
 return len;
+}
+
+char* computeCurrentCarPosition() {
+
+	//TODO: access sensors data in mutual exclusion
+
+	int value = sensors.accelerometer_value.x;
+
+	if (value < 0 && value > -100) {
+
+		return "|         *          |\r\n";
+
+	} else if (value < -100 && value > -200) {
+
+		return "|        *           |\r\n";
+
+	} else if (value < -200 && value > -300) {
+
+		return "|       *            |\r\n";
+
+	} else if (value < -300 && value > -400) {
+
+		return "|      *             |\r\n";
+
+	} else if (value < -400 && value > -500) {
+
+		return "|      *             |\r\n";
+
+	} else if (value < -500 && value > -600) {
+
+		return "|    *               |\r\n";
+
+	} else if (value < -600 && value > -700) {
+
+		return "|   *                |\r\n";
+
+	} else if (value < -700 && value > -800) {
+
+		return "|  *                 |\r\n";
+
+	} else if (value < -800) {
+
+		return "|*                   |\r\n";
+
+	} else if (value > 0 && value < 100) {
+
+		return "|          *         |\r\n";
+
+	} else if (value > 100 && value < 200) {
+
+		return "|           *        |\r\n";
+
+	} else if (value > 200 && value < 300) {
+
+		return "|            *       |\r\n";
+
+	} else if (value > 300 && value < 400) {
+
+		return "|             *      |\r\n";
+
+	} else if (value > 400 && value < 500) {
+
+		return "|              *     |\r\n";
+
+	} else if (value > 500 && value < 600) {
+
+		return "|               *    |\r\n";
+
+	} else if (value > 600 && value < 700) {
+
+		return "|                *   |\r\n";
+
+	} else if (value > 700 && value < 800) {
+
+		return "|                 *  |\r\n";
+
+
+	} else if (value > 800) {
+
+		return "|                   *|\r\n";
+
+	}
+
+	else {
+
+		return "|          *         |\r\n";
+	}
+
 }
 
 /* USER CODE END 0 */
@@ -170,13 +245,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DFSDM1_Init();
   MX_I2C2_Init();
-  MX_QUADSPI_Init();
   MX_SPI3_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
-  MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
   	//User button
@@ -199,15 +271,15 @@ int main(void)
 
 	//Motion sensors
 
-	BSP_MOTION_SENSOR_Init(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO);
+	//BSP_MOTION_SENSOR_Init(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO);
 	BSP_MOTION_SENSOR_Init(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO);
 
-	BSP_MOTION_SENSOR_Enable(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO);
+	//BSP_MOTION_SENSOR_Enable(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO);
 	BSP_MOTION_SENSOR_Enable(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO);
 
 	//Proximity
 
-	VL53L0X_PROXIMITY_Init();
+	//VL53L0X_PROXIMITY_Init();
 
 	//Struct elements initialization
 
@@ -215,6 +287,8 @@ int main(void)
 	sensors.pressure_value = 0;
 	sensors.temperature_value = 0;
 	sensors.proximity = 0;
+//	sensors.gyroscope_value = {0, 0, 0};
+//	sensors.accelerometer_value = {0, 0, 0};
 
   /* USER CODE END 2 */
 
@@ -236,32 +310,24 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 1024);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* definition and creation of tempSensorTask */
-  osThreadDef(tempSensorTask, startTempSensorTask, osPriorityNormal, 0, 128);
-  tempSensorTaskHandle = osThreadCreate(osThread(tempSensorTask), NULL);
-
-  /* definition and creation of serialLogTask */
-  osThreadDef(serialLogTask, startSerialLogTask, osPriorityNormal, 0, 128);
-  serialLogTaskHandle = osThreadCreate(osThread(serialLogTask), NULL);
-
-  /* definition and creation of humiditySensorT */
-  osThreadDef(humiditySensorT, startHumiditySensorTask, osPriorityNormal, 0, 128);
-  humiditySensorTHandle = osThreadCreate(osThread(humiditySensorT), NULL);
-
-  /* definition and creation of pressureSensorT */
-  osThreadDef(pressureSensorT, startPressureSensorTask, osPriorityNormal, 0, 128);
-  pressureSensorTHandle = osThreadCreate(osThread(pressureSensorT), NULL);
-
-  /* definition and creation of nfcTagTask */
-  osThreadDef(nfcTagTask, startNfcTagTask, osPriorityNormal, 0, 128);
-  nfcTagTaskHandle = osThreadCreate(osThread(nfcTagTask), NULL);
+  /* definition and creation of serialPrintTask */
+  osThreadDef(serialPrintTask, startSerialPrintTask, osPriorityNormal, 0, 1024);
+  serialPrintTaskHandle = osThreadCreate(osThread(serialPrintTask), NULL);
 
   /* definition and creation of userButtonTask */
-  osThreadDef(userButtonTask, startUserButtonTask, osPriorityAboveNormal, 0, 128);
+  osThreadDef(userButtonTask, startUserButtonTask, osPriorityAboveNormal, 0, 1024);
   userButtonTaskHandle = osThreadCreate(osThread(userButtonTask), NULL);
+
+  /* definition and creation of environmentalSensorsTask */
+  osThreadDef(environmentalSensorsTask, startEnvironmentalSensorsTask, osPriorityNormal, 0, 1024);
+  environmentalSensorsTaskHandle = osThreadCreate(osThread(environmentalSensorsTask), NULL);
+
+  /* definition and creation of gyroscopeTask */
+  osThreadDef(gyroscopeTask, startGyroscopeTask, osPriorityNormal, 0, 1024);
+  gyroscopeTaskHandle = osThreadCreate(osThread(gyroscopeTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -339,44 +405,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief DFSDM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_DFSDM1_Init(void)
-{
-
-  /* USER CODE BEGIN DFSDM1_Init 0 */
-
-  /* USER CODE END DFSDM1_Init 0 */
-
-  /* USER CODE BEGIN DFSDM1_Init 1 */
-
-  /* USER CODE END DFSDM1_Init 1 */
-  hdfsdm1_channel1.Instance = DFSDM1_Channel1;
-  hdfsdm1_channel1.Init.OutputClock.Activation = ENABLE;
-  hdfsdm1_channel1.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel1.Init.OutputClock.Divider = 2;
-  hdfsdm1_channel1.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
-  hdfsdm1_channel1.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
-  hdfsdm1_channel1.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
-  hdfsdm1_channel1.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_RISING;
-  hdfsdm1_channel1.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
-  hdfsdm1_channel1.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
-  hdfsdm1_channel1.Init.Awd.Oversampling = 1;
-  hdfsdm1_channel1.Init.Offset = 0;
-  hdfsdm1_channel1.Init.RightBitShift = 0x00;
-  if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN DFSDM1_Init 2 */
-
-  /* USER CODE END DFSDM1_Init 2 */
-
-}
-
-/**
   * @brief I2C2 Initialization Function
   * @param None
   * @retval None
@@ -419,39 +447,6 @@ static void MX_I2C2_Init(void)
   /* USER CODE BEGIN I2C2_Init 2 */
 
   /* USER CODE END I2C2_Init 2 */
-
-}
-
-/**
-  * @brief QUADSPI Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_QUADSPI_Init(void)
-{
-
-  /* USER CODE BEGIN QUADSPI_Init 0 */
-
-  /* USER CODE END QUADSPI_Init 0 */
-
-  /* USER CODE BEGIN QUADSPI_Init 1 */
-
-  /* USER CODE END QUADSPI_Init 1 */
-  /* QUADSPI parameter configuration*/
-  hqspi.Instance = QUADSPI;
-  hqspi.Init.ClockPrescaler = 2;
-  hqspi.Init.FifoThreshold = 4;
-  hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_HALFCYCLE;
-  hqspi.Init.FlashSize = 23;
-  hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE;
-  hqspi.Init.ClockMode = QSPI_CLOCK_MODE_0;
-  if (HAL_QSPI_Init(&hqspi) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN QUADSPI_Init 2 */
-
-  /* USER CODE END QUADSPI_Init 2 */
 
 }
 
@@ -562,41 +557,6 @@ static void MX_USART3_UART_Init(void)
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
-
-}
-
-/**
-  * @brief USB_OTG_FS Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USB_OTG_FS_PCD_Init(void)
-{
-
-  /* USER CODE BEGIN USB_OTG_FS_Init 0 */
-
-  /* USER CODE END USB_OTG_FS_Init 0 */
-
-  /* USER CODE BEGIN USB_OTG_FS_Init 1 */
-
-  /* USER CODE END USB_OTG_FS_Init 1 */
-  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
-  hpcd_USB_OTG_FS.Init.dev_endpoints = 6;
-  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
-  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
-  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.battery_charging_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
-  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = DISABLE;
-  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USB_OTG_FS_Init 2 */
-
-  /* USER CODE END USB_OTG_FS_Init 2 */
 
 }
 
@@ -726,6 +686,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : DFSDM1_DATIN2_Pin DFSDM1_CKOUT_Pin */
+  GPIO_InitStruct.Pin = DFSDM1_DATIN2_Pin|DFSDM1_CKOUT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF6_DFSDM1;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : QUADSPI_CLK_Pin QUADSPI_NCS_Pin OQUADSPI_BK1_IO0_Pin QUADSPI_BK1_IO1_Pin
+                           QUAD_SPI_BK1_IO2_Pin QUAD_SPI_BK1_IO3_Pin */
+  GPIO_InitStruct.Pin = QUADSPI_CLK_Pin|QUADSPI_NCS_Pin|OQUADSPI_BK1_IO0_Pin|QUADSPI_BK1_IO1_Pin
+                          |QUAD_SPI_BK1_IO2_Pin|QUAD_SPI_BK1_IO3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF10_QUADSPI;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
   /*Configure GPIO pins : LPS22HB_INT_DRDY_EXTI0_Pin LSM6DSL_INT1_EXTI11_Pin ARD_D2_Pin HTS221_DRDY_EXTI15_Pin
                            PMOD_IRQ_EXTI12_Pin */
   GPIO_InitStruct.Pin = LPS22HB_INT_DRDY_EXTI0_Pin|LSM6DSL_INT1_EXTI11_Pin|ARD_D2_Pin|HTS221_DRDY_EXTI15_Pin
@@ -753,6 +731,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : USB_OTG_FS_VBUS_Pin */
+  GPIO_InitStruct.Pin = USB_OTG_FS_VBUS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(USB_OTG_FS_VBUS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : USB_OTG_FS_ID_Pin USB_OTG_FS_DM_Pin USB_OTG_FS_DP_Pin */
+  GPIO_InitStruct.Pin = USB_OTG_FS_ID_Pin|USB_OTG_FS_DM_Pin|USB_OTG_FS_DP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PMOD_SPI2_SCK_Pin */
   GPIO_InitStruct.Pin = PMOD_SPI2_SCK_Pin;
@@ -804,176 +796,61 @@ void StartDefaultTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
-		//TEST
-
-		//BSP_LED_Toggle(LED2);
-		BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
-		BSP_MOTION_SENSOR_Axes_t  gyr_value = {0, 0, 0};
-		BSP_MOTION_SENSOR_Axes_t  mag_value = {0, 0, 0};
-
-		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
-		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO, &gyr_value);
-
-		sensors.acc_value = acc_value;
-		sensors.gyr_value = gyr_value;
-
-//		uint16_t proximity_value = 0;
-//
-//		proximity_value = VL53L0X_PROXIMITY_GetDistance();
-////
-//		sensors.proximity = proximity_value;
-
 		osDelay(1000);
 	}
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_startTempSensorTask */
+/* USER CODE BEGIN Header_startSerialPrintTask */
 /**
- * @brief Function implementing the tempSensorTask thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startTempSensorTask */
-void startTempSensorTask(void const * argument)
+* @brief Function implementing the serialPrintTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startSerialPrintTask */
+void startSerialPrintTask(void const * argument)
 {
-  /* USER CODE BEGIN startTempSensorTask */
-	/* Infinite loop */
-	for(;;)
-	{
-		//TODO: Access sensors data struct mutual exclusion
-		sensors.temperature_value = BSP_TSENSOR_ReadTemp();
-		osDelay(1000);
-	}
-  /* USER CODE END startTempSensorTask */
-}
-
-/* USER CODE BEGIN Header_startSerialLogTask */
-/**
- * @brief Function implementing the serialLogTask thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startSerialLogTask */
-void startSerialLogTask(void const * argument)
-{
-  /* USER CODE BEGIN startSerialLogTask */
-	/* Infinite loop */
-	for(;;)
-	{
-		//TODO: Access sensors data struct in mutual exclusion
-
-		printf("***** New sensors values ***** \n\r");
-
-		//Pressure
-
-		int normalized = sensors.pressure_value;
-		//printf(" PRESSURE PRINT TEST: %d \r\n", normalized);
-		snprintf(str_prs,100," PRESSURE = %d mBar \n\r", normalized);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
-
-		//Temperature
-
-		float temp_value = sensors.temperature_value;
-		int tmpInt1 = temp_value;
-		float tmpFrac = temp_value - tmpInt1;
-		int tmpInt2 = trunc(tmpFrac * 100);
-		//printf(" TEMPERATURE = %d.%02d C\r\n", tmpInt1, tmpInt2);
-		snprintf(str_tmp,100," TEMPERATURE = %d.%02d C\n\r", tmpInt1, tmpInt2);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
-
-		//Humidity
-
-		int hmd = sensors.humidity_value;
-		//printf(" HUMIDITY = %d %%\r\n", hmd);
-		snprintf(str_hmd,100," HUMIDITY = %d %%\n\r", hmd);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
-
-		//Gyroscope
-
-		BSP_MOTION_SENSOR_Axes_t gyro = sensors.gyr_value;
-		//printf(" HUMIDITY = %d %%\r\n", hmd);
-		snprintf(str_gyro,100, "GYR-X\": %d, \"GYR-Y\": %d, \"GYR-Z\": %d,", gyro.x, gyro.y, gyro.z);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
-
-		//printf(" HUMIDITY = %d %%\r\n", hmd);
-		snprintf(str_gyro,100, "DISTANCE = %d \n\r,", sensors.proximity);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
-
-		printf("\n\r");
-
-		osDelay(3000);
-	}
-  /* USER CODE END startSerialLogTask */
-}
-
-/* USER CODE BEGIN Header_startHumiditySensorTask */
-/**
- * @brief Function implementing the humiditySensorT thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startHumiditySensorTask */
-void startHumiditySensorTask(void const * argument)
-{
-  /* USER CODE BEGIN startHumiditySensorTask */
-	/* Infinite loop */
-	for(;;)
-	{
-		//TODO: Access sensors data struct in mutual exclusion
-		sensors.humidity_value = BSP_HSENSOR_ReadHumidity();
-		osDelay(1000);
-	}
-  /* USER CODE END startHumiditySensorTask */
-}
-
-/* USER CODE BEGIN Header_startPressureSensorTask */
-/**
- * @brief Function implementing the pressureSensorT thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startPressureSensorTask */
-void startPressureSensorTask(void const * argument)
-{
-  /* USER CODE BEGIN startPressureSensorTask */
-
-	/* Infinite loop */
-	for(;;)
-	{
-		//TODO: Access sensors data struct in mutual exclusion
-		sensors.pressure_value = BSP_PSENSOR_ReadPressure();
-		osDelay(1000);
-	}
-  /* USER CODE END startPressureSensorTask */
-}
-
-/* USER CODE BEGIN Header_startNfcTagTask */
-/**
- * @brief Function implementing the nfcTagTask thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startNfcTagTask */
-void startNfcTagTask(void const * argument)
-{
-  /* USER CODE BEGIN startNfcTagTask */
-	/* Infinite loop */
-	for(;;)
-	{
-//		sURI_Info URI;
+  /* USER CODE BEGIN startSerialPrintTask */
+  /* Infinite loop */
+  for(;;)
+  {
+//	  printf("***** New sensors values ***** \n\r");
 //
-//		/* Prepare URI NDEF message content */
-//		strcpy(URI.protocol,URI_ID_0x01_STRING);
-//		strcpy(URI.URI_Message,"theverge.com");
-//		strcpy(URI.Information,"\0");
+	  		//Pressure
+
+//	  		int normalized = sensors.pressure_value;
+//	  		snprintf(str_prs,100," PRESSURE = %d mBar \n\r", normalized);
+//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
 //
-//		/* First write NDEF */
-//		TT4_WriteURI(&URI);
+//	  		//Temperature
 //
-//		osDelay(1000);
-	}
-  /* USER CODE END startNfcTagTask */
+//	  		float temp_value = sensors.temperature_value;
+//	  		int tmpInt1 = temp_value;
+//	  		float tmpFrac = temp_value - tmpInt1;
+//	  		int tmpInt2 = trunc(tmpFrac * 100);
+//	  		snprintf(str_tmp,100," TEMPERATURE = %d.%02d C\n\r", tmpInt1, tmpInt2);
+//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
+//
+//	  		//Humidity
+//
+//	  		int hmd = sensors.humidity_value;
+//	  		snprintf(str_hmd,100," HUMIDITY = %d %%\n\r", hmd);
+//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+
+	  		//Gyroscope
+
+//	  		BSP_MOTION_SENSOR_Axes_t gyro = sensors.gyroscope_value;
+//	  		snprintf(str_gyro,100, "GYR-X\": %ld, \"GYR-Y\": %ld, \"GYR-Z\": %ld,", gyro.x, gyro.y, gyro.z);
+//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+
+//	  		snprintf(str_gyro,100, "DISTANCE = %d \n\r,", sensors.proximity);
+//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+
+	  		//printf("\n\r");
+
+	  		osDelay(1000);
+  }
+  /* USER CODE END startSerialPrintTask */
 }
 
 /* USER CODE BEGIN Header_startUserButtonTask */
@@ -1011,6 +888,77 @@ void startUserButtonTask(void const * argument)
 	}
   }
   /* USER CODE END startUserButtonTask */
+}
+
+/* USER CODE BEGIN Header_startEnvironmentalSensorsTask */
+/**
+* @brief Function implementing the environmentalSensorsTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startEnvironmentalSensorsTask */
+void startEnvironmentalSensorsTask(void const * argument)
+{
+  /* USER CODE BEGIN startEnvironmentalSensorsTask */
+  /* Infinite loop */
+  for(;;)
+  {
+	  //TODO: Access sensors data struct mutual exclusion
+	  sensors.temperature_value = BSP_TSENSOR_ReadTemp();
+
+
+	  //TODO: Access sensors data struct in mutual exclusion
+	  sensors.humidity_value = BSP_HSENSOR_ReadHumidity();
+
+	  //TODO: Access sensors data struct in mutual exclusion
+	  sensors.pressure_value = BSP_PSENSOR_ReadPressure();
+
+	  osDelay(1000);
+  }
+  /* USER CODE END startEnvironmentalSensorsTask */
+}
+
+/* USER CODE BEGIN Header_startGyroscopeTask */
+/**
+* @brief Function implementing the gyroscopeTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startGyroscopeTask */
+void startGyroscopeTask(void const * argument)
+{
+  /* USER CODE BEGIN startGyroscopeTask */
+  /* Infinite loop */
+  for(;;)
+  {
+	  		BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
+	  		BSP_MOTION_SENSOR_Axes_t  gyr_value = {0, 0, 0};
+	  		//BSP_MOTION_SENSOR_Axes_t  mag_value = {0, 0, 0};
+
+	  		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
+	  		//BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO, &gyr_value);
+
+	  		sensors.accelerometer_value = acc_value;
+	  		//sensors.gyroscope_value = gyr_value;
+
+	  		//BSP_MOTION_SENSOR_Axes_t gyro = sensors.gyroscope_value;
+	  		//snprintf(str_gyro,100, "ACC-X\": %ld, \"ACC-Y\": %ld, \"ACC-Z\": %ld \r\n", acc_value.x, acc_value.y, acc_value.z);
+	  		//HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+
+	  		//char position[100] = ;
+
+	  		snprintf(str_gyro,100, computeCurrentCarPosition());
+	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+
+	  //		uint16_t proximity_value = 0;
+	  //
+	  //		proximity_value = VL53L0X_PROXIMITY_GetDistance();
+	  ////
+	  //		sensors.proximity = proximity_value;
+
+	  		osDelay(500);
+  }
+  /* USER CODE END startGyroscopeTask */
 }
 
 /**
@@ -1066,4 +1014,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
