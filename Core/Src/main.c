@@ -41,6 +41,8 @@
 /* USER CODE BEGIN PD */
 #define INSTANCE_GYROSCOPE_ACCELEROMETER 0
 #define INSTANCE_MAGNETOMETER 1
+#define OS_DELAY 250
+#define MUTEX_WAIT_TIMEOUT osWaitForever
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -56,12 +58,13 @@ SPI_HandleTypeDef hspi3;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
 
-osThreadId defaultTaskHandle;
+osThreadId greenLightTaskHandle;
 osThreadId serialPrintTaskHandle;
 osThreadId userButtonTaskHandle;
 osThreadId environmentalSensorsTaskHandle;
 osThreadId gyroscopeTaskHandle;
 osThreadId proximitySensorTaskHandle;
+osMutexId sensorsMutexHandle;
 /* USER CODE BEGIN PV */
 
 struct sensors_t {
@@ -70,7 +73,6 @@ struct sensors_t {
 	float humidity_value; // Shared measured humidity value
 	float pressure_value;  // Shared measured pressure value
 	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
-	BSP_MOTION_SENSOR_Axes_t  gyroscope_value; //Shared gyroscope value
 	uint16_t proximity; //Shared proximity value
 
 } sensors;
@@ -109,7 +111,7 @@ static void MX_I2C2_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
-void StartDefaultTask(void const * argument);
+void startGreenLightTask(void const * argument);
 void startSerialPrintTask(void const * argument);
 void startUserButtonTask(void const * argument);
 void startEnvironmentalSensorsTask(void const * argument);
@@ -124,13 +126,13 @@ void startProximitySensorTask(void const * argument);
 /* USER CODE BEGIN 0 */
 int _write(int file, char *ptr, int len)
 {
-HAL_UART_Transmit(&huart1,(uint8_t *)ptr,len,10);
-return len;
+	HAL_UART_Transmit(&huart1,(uint8_t *)ptr,len,10);
+	return len;
 }
 
 char* computeCurrentCarPosition() {
 
-	//TODO: access sensors data in mutual exclusion
+	//This method is called inside a mutex so there's no need to protect the sensors struct here
 
 	int value = sensors.accelerometer_value.x;
 
@@ -252,24 +254,24 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  //Proximity
+	//Proximity
 
 	VL53L0X_PROXIMITY_Init();
 
-  	//User button
-  	BSP_PB_Init(BUTTON_USER, BUTTON_MODE_GPIO);
+	//User button
+	BSP_PB_Init(BUTTON_USER, BUTTON_MODE_GPIO);
 
 	//Temperature
 	BSP_TSENSOR_Init();
 	printf(tmpSensorMsg);
 	//HAL_UART_Transmit(&huart1,tmpSensorMsg,sizeof(tmpSensorMsg),1000);
 
-//	//Humidity
+	//	//Humidity
 	BSP_HSENSOR_Init();
 	printf(hmdSensorMsg);
 	//HAL_UART_Transmit(&huart1,hmdSensorMsg,sizeof(hmdSensorMsg),1000);
 
-//	//Pressure
+	//	//Pressure
 	BSP_PSENSOR_Init();
 	printf(prsSensorMsg);
 	//HAL_UART_Transmit(&huart1,prsSensorMsg,sizeof(prsSensorMsg),1000);
@@ -291,6 +293,11 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* Create the mutex(es) */
+  /* definition and creation of sensorsMutex */
+  osMutexDef(sensorsMutex);
+  sensorsMutexHandle = osMutexCreate(osMutex(sensorsMutex));
+
   /* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
@@ -308,9 +315,9 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 1024);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  /* definition and creation of greenLightTask */
+  osThreadDef(greenLightTask, startGreenLightTask, osPriorityNormal, 0, 1024);
+  greenLightTaskHandle = osThreadCreate(osThread(greenLightTask), NULL);
 
   /* definition and creation of serialPrintTask */
   osThreadDef(serialPrintTask, startSerialPrintTask, osPriorityNormal, 0, 1024);
@@ -786,184 +793,199 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_startGreenLightTask */
 /**
- * @brief  Function implementing the defaultTask thread.
- * @param  argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+  * @brief  Function implementing the greenLightTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_startGreenLightTask */
+void startGreenLightTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
 	/* Infinite loop */
 	for(;;)
 	{
-		osDelay(1000);
+		BSP_LED_Toggle(LED2);
+		osDelay(OS_DELAY);
 	}
   /* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_startSerialPrintTask */
 /**
-* @brief Function implementing the serialPrintTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the serialPrintTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_startSerialPrintTask */
 void startSerialPrintTask(void const * argument)
 {
   /* USER CODE BEGIN startSerialPrintTask */
-  /* Infinite loop */
-  for(;;)
-  {
-//	  printf("***** New sensors values ***** \n\r");
-//
-	  		//Pressure
+	/* Infinite loop */
+	for(;;)
+	{
+		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
+		//
+		//	  		//Pressure
+		//
+		int normalized = sensors.pressure_value;
+		snprintf(str_prs,100," PRESSURE = %d mBar \n\r", normalized);
+		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
+		//
+		//	  		//Temperature
+		//
+		float temp_value = sensors.temperature_value;
+		int tmpInt1 = temp_value;
+		float tmpFrac = temp_value - tmpInt1;
+		int tmpInt2 = trunc(tmpFrac * 100);
+		snprintf(str_tmp,100," TEMPERATURE = %d.%02d C\n\r", tmpInt1, tmpInt2);
+		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
+		//
+		//	  		//Humidity
+		//
+		int hmd = sensors.humidity_value;
+		snprintf(str_hmd,100," HUMIDITY = %d %%\n\r", hmd);
+		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+		//
+		//	  		//Gyroscope
 
-	  		int normalized = sensors.pressure_value;
-	  		snprintf(str_prs,100," PRESSURE = %d mBar \n\r", normalized);
-	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
-//
-//	  		//Temperature
-//
-	  		float temp_value = sensors.temperature_value;
-	  		int tmpInt1 = temp_value;
-	  		float tmpFrac = temp_value - tmpInt1;
-	  		int tmpInt2 = trunc(tmpFrac * 100);
-	  		snprintf(str_tmp,100," TEMPERATURE = %d.%02d C\n\r", tmpInt1, tmpInt2);
-	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
-//
-//	  		//Humidity
-//
-	  		int hmd = sensors.humidity_value;
-	  		snprintf(str_hmd,100," HUMIDITY = %d %%\n\r", hmd);
-	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+		snprintf(str_gyro,100, computeCurrentCarPosition());
+		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
 
-	  		//Gyroscope
+		snprintf(str_prx,100, "Proximity = %d \n\r", sensors.proximity);
+		HAL_UART_Transmit(&huart1,( uint8_t * )str_prx,sizeof(str_prx),1000);
 
-			snprintf(str_gyro,100, computeCurrentCarPosition());
-			HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+		//	printf("\n\r");
 
-			snprintf(str_prx,100, "Proximity = %d \n\r,", sensors.proximity);
-			HAL_UART_Transmit(&huart1,( uint8_t * )str_prx,sizeof(str_prx),1000);
+		osMutexRelease(sensorsMutexHandle);
 
-	  		printf("\n\r");
-
-	  		osDelay(500);
-  }
+		osDelay(OS_DELAY);
+	}
   /* USER CODE END startSerialPrintTask */
 }
 
 /* USER CODE BEGIN Header_startUserButtonTask */
 /**
-* @brief Function implementing the userButtonTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the userButtonTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_startUserButtonTask */
 void startUserButtonTask(void const * argument)
 {
   /* USER CODE BEGIN startUserButtonTask */
-  /* Infinite loop */
-  for(;;)
-  {
-	if (isReadingActivated == 0) {
+	/* Infinite loop */
+	for(;;)
+	{
+		if (isReadingActivated == 0) {
 
-		printf("Press the USER button to activate the weather station \n\r");
-		while(BSP_PB_GetState(BUTTON_USER) == GPIO_PIN_RESET);
-		while(BSP_PB_GetState(BUTTON_USER) == GPIO_PIN_SET);
-		printf("Button pressed, starting sensors readings \n\r");
-		isReadingActivated = 1;
-		//osThreadSetPriority(userButtonTaskHandle, osPriorityIdle);
-		osDelay(500);
+			printf("Press the USER button to start the Grand Prix \n\r");
+			while(BSP_PB_GetState(BUTTON_USER) == GPIO_PIN_RESET);
+			while(BSP_PB_GetState(BUTTON_USER) == GPIO_PIN_SET);
+			printf("Button pressed, starting the race! \n\r");
+			isReadingActivated = 1;
+			//osThreadSetPriority(userButtonTaskHandle, osPriorityIdle);
+			osDelay(500);
 
-	} else {
+		} else {
 
-		if (BSP_PB_GetState(BUTTON_USER) == GPIO_PIN_RESET) { //For detecting a long press
+			if (BSP_PB_GetState(BUTTON_USER) == GPIO_PIN_RESET) { //For detecting a long press
 
-			printf("Detected a button in reset state, preempting sensor tasks \n\r");
-			isReadingActivated = 0;
+				printf("The race has been paused. \n\r");
+				isReadingActivated = 0;
+			}
+			osDelay(500);
 		}
-		osDelay(500);
 	}
-  }
   /* USER CODE END startUserButtonTask */
 }
 
 /* USER CODE BEGIN Header_startEnvironmentalSensorsTask */
 /**
-* @brief Function implementing the environmentalSensorsTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the environmentalSensorsTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_startEnvironmentalSensorsTask */
 void startEnvironmentalSensorsTask(void const * argument)
 {
   /* USER CODE BEGIN startEnvironmentalSensorsTask */
-  /* Infinite loop */
-  for(;;)
-  {
-	  //TODO: Access sensors data struct mutual exclusion
-	  sensors.temperature_value = BSP_TSENSOR_ReadTemp();
+	/* Infinite loop */
+	for(;;)
+	{
+		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-	  //TODO: Access sensors data struct in mutual exclusion
-	  sensors.humidity_value = BSP_HSENSOR_ReadHumidity();
+		//TODO: Access sensors data struct mutual exclusion
+		sensors.temperature_value = BSP_TSENSOR_ReadTemp();
 
-	  //TODO: Access sensors data struct in mutual exclusion
-	  sensors.pressure_value = BSP_PSENSOR_ReadPressure();
+		//TODO: Access sensors data struct in mutual exclusion
+		sensors.humidity_value = BSP_HSENSOR_ReadHumidity();
 
-	  osDelay(500);
-  }
+		//TODO: Access sensors data struct in mutual exclusion
+		sensors.pressure_value = BSP_PSENSOR_ReadPressure();
+
+		osMutexRelease(sensorsMutexHandle);
+
+		osDelay(OS_DELAY);
+	}
   /* USER CODE END startEnvironmentalSensorsTask */
 }
 
 /* USER CODE BEGIN Header_startGyroscopeTask */
 /**
-* @brief Function implementing the gyroscopeTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the gyroscopeTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_startGyroscopeTask */
 void startGyroscopeTask(void const * argument)
 {
   /* USER CODE BEGIN startGyroscopeTask */
-  /* Infinite loop */
-  for(;;)
-  {
-	  BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
+	/* Infinite loop */
+	for(;;)
+	{
+		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-	  BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
+		BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
 
-	  sensors.accelerometer_value = acc_value;
+		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
 
-	  osDelay(500);
-  }
+		sensors.accelerometer_value = acc_value;
+
+		osMutexRelease(sensorsMutexHandle);
+
+		osDelay(OS_DELAY);
+	}
   /* USER CODE END startGyroscopeTask */
 }
 
 /* USER CODE BEGIN Header_startProximitySensorTask */
 /**
-* @brief Function implementing the proximitySensorTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the proximitySensorTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_startProximitySensorTask */
 void startProximitySensorTask(void const * argument)
 {
   /* USER CODE BEGIN startProximitySensorTask */
 
-  /* Infinite loop */
-  for(;;)
-  {
-	  uint16_t proximity_value = 0;
+	/* Infinite loop */
+	for(;;)
+	{
+		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-	  proximity_value = VL53L0X_PROXIMITY_GetDistance();
+		uint16_t proximity_value = 0;
 
-	  sensors.proximity = proximity_value;
+		proximity_value = VL53L0X_PROXIMITY_GetDistance();
 
-	  osDelay(500);
-  }
+		sensors.proximity = proximity_value;
+
+		osMutexRelease(sensorsMutexHandle);
+
+		osDelay(OS_DELAY);
+	}
   /* USER CODE END startProximitySensorTask */
 }
 
