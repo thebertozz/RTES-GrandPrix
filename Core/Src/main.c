@@ -28,7 +28,6 @@
 #include "stm32l475e_iot01_hsensor.h"
 #include "stm32l475e_iot01_psensor.h"
 #include "stm32l475e_iot01_motion_sensors.h"
-//#include "vl53l0x_proximity.h"
 #include <math.h>
 #include <stdio.h>
 /* USER CODE END Includes */
@@ -62,6 +61,7 @@ osThreadId serialPrintTaskHandle;
 osThreadId userButtonTaskHandle;
 osThreadId environmentalSensorsTaskHandle;
 osThreadId gyroscopeTaskHandle;
+osThreadId proximitySensorTaskHandle;
 /* USER CODE BEGIN PV */
 
 struct sensors_t {
@@ -78,17 +78,17 @@ struct sensors_t {
 //Temperature sensor
 
 char str_tmp[100] = ""; // Formatted message to display the temperature value
-uint8_t tmpSensorMsg[] = "****** Temperature sensor initialized ******\r\n";
+uint8_t tmpSensorMsg[] = "****** Track temperature sensor initialized! ******\r\n";
 
 //Pressure sensor
 
 char str_hmd[100] = ""; // Formatted message to display the humidity value
-uint8_t hmdSensorMsg[] = "****** Humidity sensor initialized ******\r\n";
+uint8_t hmdSensorMsg[] = "****** Track humidity sensor initialized! ******\r\n";
 
 //Pressure sensor
 
 char str_prs[100] = ""; // Formatted message to display the temperature value
-uint8_t prsSensorMsg[] = "****** Pressure sensor initialized ******\r\n";
+uint8_t prsSensorMsg[] = "****** Track ambient pressure sensor initialized! ******\r\n";
 
 //Motion sensors
 
@@ -114,6 +114,7 @@ void startSerialPrintTask(void const * argument);
 void startUserButtonTask(void const * argument);
 void startEnvironmentalSensorsTask(void const * argument);
 void startGyroscopeTask(void const * argument);
+void startProximitySensorTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -251,6 +252,10 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  //Proximity
+
+	VL53L0X_PROXIMITY_Init();
+
   	//User button
   	BSP_PB_Init(BUTTON_USER, BUTTON_MODE_GPIO);
 
@@ -277,18 +282,12 @@ int main(void)
 	//BSP_MOTION_SENSOR_Enable(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO);
 	BSP_MOTION_SENSOR_Enable(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO);
 
-	//Proximity
-
-	//VL53L0X_PROXIMITY_Init();
-
 	//Struct elements initialization
 
 	sensors.humidity_value = 0;
 	sensors.pressure_value = 0;
 	sensors.temperature_value = 0;
 	sensors.proximity = 0;
-//	sensors.gyroscope_value = {0, 0, 0};
-//	sensors.accelerometer_value = {0, 0, 0};
 
   /* USER CODE END 2 */
 
@@ -328,6 +327,10 @@ int main(void)
   /* definition and creation of gyroscopeTask */
   osThreadDef(gyroscopeTask, startGyroscopeTask, osPriorityNormal, 0, 1024);
   gyroscopeTaskHandle = osThreadCreate(osThread(gyroscopeTask), NULL);
+
+  /* definition and creation of proximitySensorTask */
+  osThreadDef(proximitySensorTask, startProximitySensorTask, osPriorityNormal, 0, 1024);
+  proximitySensorTaskHandle = osThreadCreate(osThread(proximitySensorTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -818,37 +821,36 @@ void startSerialPrintTask(void const * argument)
 //
 	  		//Pressure
 
-//	  		int normalized = sensors.pressure_value;
-//	  		snprintf(str_prs,100," PRESSURE = %d mBar \n\r", normalized);
-//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
+	  		int normalized = sensors.pressure_value;
+	  		snprintf(str_prs,100," PRESSURE = %d mBar \n\r", normalized);
+	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
 //
 //	  		//Temperature
 //
-//	  		float temp_value = sensors.temperature_value;
-//	  		int tmpInt1 = temp_value;
-//	  		float tmpFrac = temp_value - tmpInt1;
-//	  		int tmpInt2 = trunc(tmpFrac * 100);
-//	  		snprintf(str_tmp,100," TEMPERATURE = %d.%02d C\n\r", tmpInt1, tmpInt2);
-//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
+	  		float temp_value = sensors.temperature_value;
+	  		int tmpInt1 = temp_value;
+	  		float tmpFrac = temp_value - tmpInt1;
+	  		int tmpInt2 = trunc(tmpFrac * 100);
+	  		snprintf(str_tmp,100," TEMPERATURE = %d.%02d C\n\r", tmpInt1, tmpInt2);
+	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
 //
 //	  		//Humidity
 //
-//	  		int hmd = sensors.humidity_value;
-//	  		snprintf(str_hmd,100," HUMIDITY = %d %%\n\r", hmd);
-//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+	  		int hmd = sensors.humidity_value;
+	  		snprintf(str_hmd,100," HUMIDITY = %d %%\n\r", hmd);
+	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
 
 	  		//Gyroscope
 
-//	  		BSP_MOTION_SENSOR_Axes_t gyro = sensors.gyroscope_value;
-//	  		snprintf(str_gyro,100, "GYR-X\": %ld, \"GYR-Y\": %ld, \"GYR-Z\": %ld,", gyro.x, gyro.y, gyro.z);
-//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+			snprintf(str_gyro,100, computeCurrentCarPosition());
+			HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
 
-//	  		snprintf(str_gyro,100, "DISTANCE = %d \n\r,", sensors.proximity);
-//	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
+			snprintf(str_prx,100, "Proximity = %d \n\r,", sensors.proximity);
+			HAL_UART_Transmit(&huart1,( uint8_t * )str_prx,sizeof(str_prx),1000);
 
-	  		//printf("\n\r");
+	  		printf("\n\r");
 
-	  		osDelay(1000);
+	  		osDelay(500);
   }
   /* USER CODE END startSerialPrintTask */
 }
@@ -874,7 +876,7 @@ void startUserButtonTask(void const * argument)
 		printf("Button pressed, starting sensors readings \n\r");
 		isReadingActivated = 1;
 		//osThreadSetPriority(userButtonTaskHandle, osPriorityIdle);
-		osDelay(1000);
+		osDelay(500);
 
 	} else {
 
@@ -883,8 +885,7 @@ void startUserButtonTask(void const * argument)
 			printf("Detected a button in reset state, preempting sensor tasks \n\r");
 			isReadingActivated = 0;
 		}
-
-		osDelay(1);
+		osDelay(500);
 	}
   }
   /* USER CODE END startUserButtonTask */
@@ -906,14 +907,13 @@ void startEnvironmentalSensorsTask(void const * argument)
 	  //TODO: Access sensors data struct mutual exclusion
 	  sensors.temperature_value = BSP_TSENSOR_ReadTemp();
 
-
 	  //TODO: Access sensors data struct in mutual exclusion
 	  sensors.humidity_value = BSP_HSENSOR_ReadHumidity();
 
 	  //TODO: Access sensors data struct in mutual exclusion
 	  sensors.pressure_value = BSP_PSENSOR_ReadPressure();
 
-	  osDelay(1000);
+	  osDelay(500);
   }
   /* USER CODE END startEnvironmentalSensorsTask */
 }
@@ -931,34 +931,40 @@ void startGyroscopeTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	  		BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
-	  		BSP_MOTION_SENSOR_Axes_t  gyr_value = {0, 0, 0};
-	  		//BSP_MOTION_SENSOR_Axes_t  mag_value = {0, 0, 0};
+	  BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
 
-	  		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
-	  		//BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_GYRO, &gyr_value);
+	  BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
 
-	  		sensors.accelerometer_value = acc_value;
-	  		//sensors.gyroscope_value = gyr_value;
+	  sensors.accelerometer_value = acc_value;
 
-	  		//BSP_MOTION_SENSOR_Axes_t gyro = sensors.gyroscope_value;
-	  		//snprintf(str_gyro,100, "ACC-X\": %ld, \"ACC-Y\": %ld, \"ACC-Z\": %ld \r\n", acc_value.x, acc_value.y, acc_value.z);
-	  		//HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
-
-	  		//char position[100] = ;
-
-	  		snprintf(str_gyro,100, computeCurrentCarPosition());
-	  		HAL_UART_Transmit(&huart1,( uint8_t * )str_gyro,sizeof(str_gyro),1000);
-
-	  //		uint16_t proximity_value = 0;
-	  //
-	  //		proximity_value = VL53L0X_PROXIMITY_GetDistance();
-	  ////
-	  //		sensors.proximity = proximity_value;
-
-	  		osDelay(500);
+	  osDelay(500);
   }
   /* USER CODE END startGyroscopeTask */
+}
+
+/* USER CODE BEGIN Header_startProximitySensorTask */
+/**
+* @brief Function implementing the proximitySensorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startProximitySensorTask */
+void startProximitySensorTask(void const * argument)
+{
+  /* USER CODE BEGIN startProximitySensorTask */
+
+  /* Infinite loop */
+  for(;;)
+  {
+	  uint16_t proximity_value = 0;
+
+	  proximity_value = VL53L0X_PROXIMITY_GetDistance();
+
+	  sensors.proximity = proximity_value;
+
+	  osDelay(500);
+  }
+  /* USER CODE END startProximitySensorTask */
 }
 
 /**
