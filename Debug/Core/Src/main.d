@@ -66,7 +66,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/BSP/B-L475E-IOT01/../Components/lsm6dsl/lsm6dsl.h \
  ../Drivers/BSP/B-L475E-IOT01/../Components/lsm6dsl/lsm6dsl_reg.h \
  ../Drivers/BSP/B-L475E-IOT01/../Components/lis3mdl/lis3mdl.h \
- ../Drivers/BSP/B-L475E-IOT01/../Components/lis3mdl/lis3mdl_reg.h
+ ../Drivers/BSP/B-L475E-IOT01/../Components/lis3mdl/lis3mdl_reg.h \
+ ../Core/Inc/track_utils.h
 
 ../Core/Inc/main.h:
 
@@ -205,3 +206,5 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/BSP/B-L475E-IOT01/../Components/lis3mdl/lis3mdl.h:
 
 ../Drivers/BSP/B-L475E-IOT01/../Components/lis3mdl/lis3mdl_reg.h:
+
+../Core/Inc/track_utils.h:
