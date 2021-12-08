@@ -45,6 +45,8 @@
 #define OS_DELAY_WAITING 5000
 #define OS_DELAY_RACING 250
 #define MUTEX_WAIT_TIMEOUT osWaitForever
+#define WAITING_FOR_GREEN_LIGHT 0
+#define RACING 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,18 +69,27 @@ osThreadId environmentalSensorsTaskHandle;
 osThreadId proximitySensorTaskHandle;
 osThreadId raceDataPrintTaskHandle;
 osThreadId accelerometerTaskHandle;
-osMutexId sensorsMutexHandle;
+osMutexId managerMutexHandle;
+osSemaphoreId userButtonSemaphoreHandle;
+osSemaphoreId environmentSensorsSemaphoreHandle;
+osSemaphoreId trackDataSemaphoreHandle;
+osSemaphoreId greenLightSemaphoreHandle;
+osSemaphoreId proximitySensorSemaphoreHandle;
+osSemaphoreId raceDataSemaphoreHandle;
+osSemaphoreId accelerometerSemaphoreHandle;
 /* USER CODE BEGIN PV */
 
-struct sensors_t {
+struct manager_t {
 
 	float temperature_value;  // Shared measured temperature value
 	float humidity_value; // Shared measured humidity value
 	float pressure_value;  // Shared measured pressure value
 	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
 	uint16_t proximity; //Shared proximity value
+	int isRaceStarted;
+	int b_green_light, b_track_data, b_user_button, b_environment, b_proximity, b_race_data, b_accelerometer;
 
-} sensors;
+} manager;
 
 //Temperature sensor
 
@@ -197,21 +208,52 @@ int main(void)
 
 	//Struct elements initialization
 
-	sensors.humidity_value = 0;
-	sensors.pressure_value = 0;
-	sensors.temperature_value = 0;
-	sensors.proximity = 0;
+	manager.humidity_value = 0;
+	manager.pressure_value = 0;
+	manager.temperature_value = 0;
+	manager.proximity = 0;
+	manager.b_accelerometer, manager.b_environment, manager.b_green_light, manager.b_proximity,
+	manager.b_proximity, manager.b_race_data, manager.b_track_data, manager.b_user_button = 0;
 
   /* USER CODE END 2 */
 
   /* Create the mutex(es) */
-  /* definition and creation of sensorsMutex */
-  osMutexDef(sensorsMutex);
-  sensorsMutexHandle = osMutexCreate(osMutex(sensorsMutex));
+  /* definition and creation of managerMutex */
+  osMutexDef(managerMutex);
+  managerMutexHandle = osMutexCreate(osMutex(managerMutex));
 
   /* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* definition and creation of userButtonSemaphore */
+  osSemaphoreDef(userButtonSemaphore);
+  userButtonSemaphoreHandle = osSemaphoreCreate(osSemaphore(userButtonSemaphore), 1);
+
+  /* definition and creation of environmentSensorsSemaphore */
+  osSemaphoreDef(environmentSensorsSemaphore);
+  environmentSensorsSemaphoreHandle = osSemaphoreCreate(osSemaphore(environmentSensorsSemaphore), 1);
+
+  /* definition and creation of trackDataSemaphore */
+  osSemaphoreDef(trackDataSemaphore);
+  trackDataSemaphoreHandle = osSemaphoreCreate(osSemaphore(trackDataSemaphore), 1);
+
+  /* definition and creation of greenLightSemaphore */
+  osSemaphoreDef(greenLightSemaphore);
+  greenLightSemaphoreHandle = osSemaphoreCreate(osSemaphore(greenLightSemaphore), 1);
+
+  /* definition and creation of proximitySensorSemaphore */
+  osSemaphoreDef(proximitySensorSemaphore);
+  proximitySensorSemaphoreHandle = osSemaphoreCreate(osSemaphore(proximitySensorSemaphore), 1);
+
+  /* definition and creation of raceDataSemaphore */
+  osSemaphoreDef(raceDataSemaphore);
+  raceDataSemaphoreHandle = osSemaphoreCreate(osSemaphore(raceDataSemaphore), 1);
+
+  /* definition and creation of accelerometerSemaphore */
+  osSemaphoreDef(accelerometerSemaphore);
+  accelerometerSemaphoreHandle = osSemaphoreCreate(osSemaphore(accelerometerSemaphore), 1);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
@@ -231,15 +273,15 @@ int main(void)
   greenLightTaskHandle = osThreadCreate(osThread(greenLightTask), NULL);
 
   /* definition and creation of trackDataPrintTask */
-  osThreadDef(trackDataPrintTask, startTrackDataPrintTask, osPriorityAboveNormal, 0, 1024);
+  osThreadDef(trackDataPrintTask, startTrackDataPrintTask, osPriorityNormal, 0, 1024);
   trackDataPrintTaskHandle = osThreadCreate(osThread(trackDataPrintTask), NULL);
 
   /* definition and creation of userButtonTask */
-  osThreadDef(userButtonTask, startUserButtonTask, osPriorityAboveNormal, 0, 1024);
+  osThreadDef(userButtonTask, startUserButtonTask, osPriorityNormal, 0, 1024);
   userButtonTaskHandle = osThreadCreate(osThread(userButtonTask), NULL);
 
   /* definition and creation of environmentalSensorsTask */
-  osThreadDef(environmentalSensorsTask, startEnvironmentalSensorsTask, osPriorityAboveNormal, 0, 1024);
+  osThreadDef(environmentalSensorsTask, startEnvironmentalSensorsTask, osPriorityNormal, 0, 1024);
   environmentalSensorsTaskHandle = osThreadCreate(osThread(environmentalSensorsTask), NULL);
 
   /* definition and creation of proximitySensorTask */
@@ -752,13 +794,13 @@ void startTrackDataPrintTask(void const * argument)
 
 		//Pressure
 
-		int normalized = sensors.pressure_value;
+		int normalized = manager.pressure_value;
 		snprintf(str_prs,100,"Track pressure update: %d mBar \n\r", normalized);
 		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
 
 		//Temperature
 
-		float temp_value = sensors.temperature_value;
+		float temp_value = manager.temperature_value;
 		int tmpInt1 = temp_value;
 		float tmpFrac = temp_value - tmpInt1;
 		int tmpInt2 = trunc(tmpFrac * 100);
@@ -767,7 +809,7 @@ void startTrackDataPrintTask(void const * argument)
 
 		//Humidity
 
-		int hmd = sensors.humidity_value;
+		int hmd = manager.humidity_value;
 		snprintf(str_hmd,100,"Track humidity update: %d %%\n\r", hmd);
 		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
 
@@ -818,11 +860,11 @@ void startEnvironmentalSensorsTask(void const * argument)
 	{
 		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		sensors.temperature_value = BSP_TSENSOR_ReadTemp();
+		manager.temperature_value = BSP_TSENSOR_ReadTemp();
 
-		sensors.humidity_value = BSP_HSENSOR_ReadHumidity();
+		manager.humidity_value = BSP_HSENSOR_ReadHumidity();
 
-		sensors.pressure_value = BSP_PSENSOR_ReadPressure();
+		manager.pressure_value = BSP_PSENSOR_ReadPressure();
 
 		osMutexRelease(sensorsMutexHandle);
 
@@ -851,7 +893,7 @@ void startProximitySensorTask(void const * argument)
 
 		proximity_value = VL53L0X_PROXIMITY_GetDistance();
 
-		sensors.proximity = proximity_value;
+		manager.proximity = proximity_value;
 
 		osMutexRelease(sensorsMutexHandle);
 
@@ -873,8 +915,6 @@ void startRaceDataPrintTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
-
-		//TODO: check why this starts even if is normal priority!
 		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
 
 //		snprintf(str_acc,100, computeCurrentCarPosition(sensors.accelerometer_value.x));
@@ -906,7 +946,7 @@ void startAccelerometerTask(void const * argument)
 
 	  BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
 
-	  sensors.accelerometer_value = acc_value;
+	  manager.accelerometer_value = acc_value;
 
 	  osMutexRelease(sensorsMutexHandle);
 
