@@ -42,8 +42,7 @@
 /* USER CODE BEGIN PD */
 #define INSTANCE_GYROSCOPE_ACCELEROMETER 0
 #define INSTANCE_MAGNETOMETER 1
-#define OS_DELAY_WAITING 5000
-#define OS_DELAY_RACING 250
+#define OS_DELAY_STANDARD 250
 #define MUTEX_WAIT_TIMEOUT osWaitForever
 #define WAITING_FOR_GREEN_LIGHT 0
 #define RACING 1
@@ -65,10 +64,12 @@ UART_HandleTypeDef huart3;
 osThreadId greenLightTaskHandle;
 osThreadId trackDataPrintTaskHandle;
 osThreadId userButtonTaskHandle;
-osThreadId environmentalSensorsTaskHandle;
 osThreadId proximitySensorTaskHandle;
 osThreadId raceDataPrintTaskHandle;
 osThreadId accelerometerTaskHandle;
+osThreadId temperatureSensorTaskHandle;
+osThreadId humiditySensorTaskHandle;
+osThreadId pressureSensorTaskHandle;
 osMutexId managerMutexHandle;
 osSemaphoreId userButtonSemaphoreHandle;
 osSemaphoreId environmentSensorsSemaphoreHandle;
@@ -129,10 +130,12 @@ static void MX_USART3_UART_Init(void);
 void startGreenLightTask(void const * argument);
 void startTrackDataPrintTask(void const * argument);
 void startUserButtonTask(void const * argument);
-void startEnvironmentalSensorsTask(void const * argument);
 void startProximitySensorTask(void const * argument);
 void startRaceDataPrintTask(void const * argument);
 void startAccelerometerTask(void const * argument);
+void startTemperatureSensorTask(void const * argument);
+void startHumiditySensorTask(void const * argument);
+void startPressureSensorTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -280,10 +283,6 @@ int main(void)
   osThreadDef(userButtonTask, startUserButtonTask, osPriorityNormal, 0, 1024);
   userButtonTaskHandle = osThreadCreate(osThread(userButtonTask), NULL);
 
-  /* definition and creation of environmentalSensorsTask */
-  osThreadDef(environmentalSensorsTask, startEnvironmentalSensorsTask, osPriorityNormal, 0, 1024);
-  environmentalSensorsTaskHandle = osThreadCreate(osThread(environmentalSensorsTask), NULL);
-
   /* definition and creation of proximitySensorTask */
   osThreadDef(proximitySensorTask, startProximitySensorTask, osPriorityNormal, 0, 1024);
   proximitySensorTaskHandle = osThreadCreate(osThread(proximitySensorTask), NULL);
@@ -295,6 +294,18 @@ int main(void)
   /* definition and creation of accelerometerTask */
   osThreadDef(accelerometerTask, startAccelerometerTask, osPriorityNormal, 0, 1024);
   accelerometerTaskHandle = osThreadCreate(osThread(accelerometerTask), NULL);
+
+  /* definition and creation of temperatureSensorTask */
+  osThreadDef(temperatureSensorTask, startTemperatureSensorTask, osPriorityNormal, 0, 1024);
+  temperatureSensorTaskHandle = osThreadCreate(osThread(temperatureSensorTask), NULL);
+
+  /* definition and creation of humiditySensorTask */
+  osThreadDef(humiditySensorTask, startHumiditySensorTask, osPriorityNormal, 0, 1024);
+  humiditySensorTaskHandle = osThreadCreate(osThread(humiditySensorTask), NULL);
+
+  /* definition and creation of pressureSensorTask */
+  osThreadDef(pressureSensorTask, startPressureSensorTask, osPriorityNormal, 0, 1024);
+  pressureSensorTaskHandle = osThreadCreate(osThread(pressureSensorTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -772,7 +783,7 @@ void startGreenLightTask(void const * argument)
 	for(;;)
 	{
 		BSP_LED_Toggle(LED2);
-		osDelay(OS_DELAY_RACING);
+		osDelay(OS_DELAY_STANDARD);
 	}
   /* USER CODE END 5 */
 }
@@ -790,7 +801,10 @@ void startTrackDataPrintTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
-		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
 		//Pressure
 
@@ -813,9 +827,12 @@ void startTrackDataPrintTask(void const * argument)
 		snprintf(str_hmd,100,"Track humidity update: %d %%\n\r", hmd);
 		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
 
-		osMutexRelease(sensorsMutexHandle);
+		osMutexRelease(managerMutexHandle);
 
-		osDelay(OS_DELAY_WAITING);
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
 
 	}
   /* USER CODE END startTrackDataPrintTask */
@@ -834,43 +851,20 @@ void startUserButtonTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
 		//Callback is handled in the HAL_GPIO_EXTI_Callback method
 
 		printf("\033[2J"); //Clears the terminal
 
 		printf("Press the USER button to start the Grand Prix\r\n");
 
-		osDelay(OS_DELAY_WAITING);
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
 	}
   /* USER CODE END startUserButtonTask */
-}
-
-/* USER CODE BEGIN Header_startEnvironmentalSensorsTask */
-/**
- * @brief Function implementing the environmentalSensorsTask thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startEnvironmentalSensorsTask */
-void startEnvironmentalSensorsTask(void const * argument)
-{
-  /* USER CODE BEGIN startEnvironmentalSensorsTask */
-	/* Infinite loop */
-	for(;;)
-	{
-		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
-
-		manager.temperature_value = BSP_TSENSOR_ReadTemp();
-
-		manager.humidity_value = BSP_HSENSOR_ReadHumidity();
-
-		manager.pressure_value = BSP_PSENSOR_ReadPressure();
-
-		osMutexRelease(sensorsMutexHandle);
-
-		osDelay(OS_DELAY_WAITING);
-	}
-  /* USER CODE END startEnvironmentalSensorsTask */
 }
 
 /* USER CODE BEGIN Header_startProximitySensorTask */
@@ -887,7 +881,10 @@ void startProximitySensorTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
-		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+	    initial_time = xTaskGetTickCount();
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
 		uint16_t proximity_value = 0;
 
@@ -895,9 +892,12 @@ void startProximitySensorTask(void const * argument)
 
 		manager.proximity = proximity_value;
 
-		osMutexRelease(sensorsMutexHandle);
+		osMutexRelease(managerMutexHandle);
 
-		osDelay(OS_DELAY_RACING);
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
 	}
   /* USER CODE END startProximitySensorTask */
 }
@@ -915,44 +915,147 @@ void startRaceDataPrintTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
-		osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+	    initial_time = xTaskGetTickCount();
 
-//		snprintf(str_acc,100, computeCurrentCarPosition(sensors.accelerometer_value.x));
-//		HAL_UART_Transmit(&huart1,( uint8_t * )str_acc,sizeof(str_acc),100);
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		osMutexRelease(sensorsMutexHandle);
+		//		snprintf(str_acc,100, computeCurrentCarPosition(sensors.accelerometer_value.x));
+		//		HAL_UART_Transmit(&huart1,( uint8_t * )str_acc,sizeof(str_acc),100);
 
-		osDelay(OS_DELAY_RACING);
+		osMutexRelease(managerMutexHandle);
+
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
 	}
   /* USER CODE END startRaceDataPrintTask */
 }
 
 /* USER CODE BEGIN Header_startAccelerometerTask */
 /**
-* @brief Function implementing the accelerometerTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the accelerometerTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_startAccelerometerTask */
 void startAccelerometerTask(void const * argument)
 {
   /* USER CODE BEGIN startAccelerometerTask */
-  /* Infinite loop */
-  for(;;)
-  {
-	  osMutexWait(sensorsMutexHandle, MUTEX_WAIT_TIMEOUT);
+	/* Infinite loop */
+	for(;;)
+	{
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
 
-	  BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-	  BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
+		BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
 
-	  manager.accelerometer_value = acc_value;
+		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
 
-	  osMutexRelease(sensorsMutexHandle);
+		manager.accelerometer_value = acc_value;
 
-	  osDelay(OS_DELAY_RACING);
-  }
+		osMutexRelease(managerMutexHandle);
+
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
+	}
   /* USER CODE END startAccelerometerTask */
+}
+
+/* USER CODE BEGIN Header_startTemperatureSensorTask */
+/**
+ * @brief Function implementing the temperatureSensorTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_startTemperatureSensorTask */
+void startTemperatureSensorTask(void const * argument)
+{
+  /* USER CODE BEGIN startTemperatureSensorTask */
+
+	/* Infinite loop */
+	for(;;)
+	{
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
+
+		manager.temperature_value = BSP_TSENSOR_ReadTemp();
+
+		osMutexRelease(managerMutexHandle);
+
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
+	}
+  /* USER CODE END startTemperatureSensorTask */
+}
+
+/* USER CODE BEGIN Header_startHumiditySensorTask */
+/**
+ * @brief Function implementing the humiditySensorTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_startHumiditySensorTask */
+void startHumiditySensorTask(void const * argument)
+{
+  /* USER CODE BEGIN startHumiditySensorTask */
+	/* Infinite loop */
+	for(;;)
+	{
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
+
+		manager.humidity_value = BSP_HSENSOR_ReadHumidity();
+
+		osMutexRelease(managerMutexHandle);
+
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
+	}
+  /* USER CODE END startHumiditySensorTask */
+}
+
+/* USER CODE BEGIN Header_startPressureSensorTask */
+/**
+ * @brief Function implementing the pressureSensorTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_startPressureSensorTask */
+void startPressureSensorTask(void const * argument)
+{
+  /* USER CODE BEGIN startPressureSensorTask */
+	/* Infinite loop */
+	for(;;)
+	{
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
+
+		manager.pressure_value = BSP_PSENSOR_ReadPressure();
+
+		osMutexRelease(managerMutexHandle);
+
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
+		osDelay(OS_DELAY_STANDARD);
+	}
+  /* USER CODE END startPressureSensorTask */
 }
 
 /**
