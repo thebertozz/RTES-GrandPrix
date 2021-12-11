@@ -30,6 +30,7 @@
 #include "stm32l475e_iot01_motion_sensors.h"
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 #include "track_utils.h"
 /* USER CODE END Includes */
 
@@ -72,12 +73,14 @@ osThreadId humiditySensorTaskHandle;
 osThreadId pressureSensorTaskHandle;
 osMutexId managerMutexHandle;
 osSemaphoreId userButtonSemaphoreHandle;
-osSemaphoreId environmentSensorsSemaphoreHandle;
 osSemaphoreId trackDataSemaphoreHandle;
 osSemaphoreId greenLightSemaphoreHandle;
 osSemaphoreId proximitySensorSemaphoreHandle;
 osSemaphoreId raceDataSemaphoreHandle;
 osSemaphoreId accelerometerSemaphoreHandle;
+osSemaphoreId temperatureSensorSemaphoreHandle;
+osSemaphoreId humiditySensorSemaphoreHandle;
+osSemaphoreId pressureSensorSemaphoreHandle;
 /* USER CODE BEGIN PV */
 
 struct manager_t {
@@ -87,8 +90,9 @@ struct manager_t {
 	float pressure_value;  // Shared measured pressure value
 	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
 	uint16_t proximity; //Shared proximity value
-	int isRaceStarted;
-	int b_green_light, b_track_data, b_user_button, b_environment, b_proximity, b_race_data, b_accelerometer;
+	int status;
+	int b_green_light, b_track_data, b_user_button, b_temperature, b_humidity, b_pressure, b_proximity, b_race_data, b_accelerometer;
+	time_t track_info_update_timestamp;
 
 } manager;
 
@@ -215,8 +219,10 @@ int main(void)
 	manager.pressure_value = 0;
 	manager.temperature_value = 0;
 	manager.proximity = 0;
-	manager.b_accelerometer, manager.b_environment, manager.b_green_light, manager.b_proximity,
+	manager.b_accelerometer, manager.b_temperature, manager.b_humidity, manager.b_pressure, manager.b_green_light, manager.b_proximity,
 	manager.b_proximity, manager.b_race_data, manager.b_track_data, manager.b_user_button = 0;
+	manager.status = WAITING_FOR_GREEN_LIGHT;
+	manager.track_info_update_timestamp = -1;
 
   /* USER CODE END 2 */
 
@@ -233,10 +239,6 @@ int main(void)
   /* definition and creation of userButtonSemaphore */
   osSemaphoreDef(userButtonSemaphore);
   userButtonSemaphoreHandle = osSemaphoreCreate(osSemaphore(userButtonSemaphore), 1);
-
-  /* definition and creation of environmentSensorsSemaphore */
-  osSemaphoreDef(environmentSensorsSemaphore);
-  environmentSensorsSemaphoreHandle = osSemaphoreCreate(osSemaphore(environmentSensorsSemaphore), 1);
 
   /* definition and creation of trackDataSemaphore */
   osSemaphoreDef(trackDataSemaphore);
@@ -257,6 +259,18 @@ int main(void)
   /* definition and creation of accelerometerSemaphore */
   osSemaphoreDef(accelerometerSemaphore);
   accelerometerSemaphoreHandle = osSemaphoreCreate(osSemaphore(accelerometerSemaphore), 1);
+
+  /* definition and creation of temperatureSensorSemaphore */
+  osSemaphoreDef(temperatureSensorSemaphore);
+  temperatureSensorSemaphoreHandle = osSemaphoreCreate(osSemaphore(temperatureSensorSemaphore), 1);
+
+  /* definition and creation of humiditySensorSemaphore */
+  osSemaphoreDef(humiditySensorSemaphore);
+  humiditySensorSemaphoreHandle = osSemaphoreCreate(osSemaphore(humiditySensorSemaphore), 1);
+
+  /* definition and creation of pressureSensorSemaphore */
+  osSemaphoreDef(pressureSensorSemaphore);
+  pressureSensorSemaphoreHandle = osSemaphoreCreate(osSemaphore(pressureSensorSemaphore), 1);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
@@ -296,15 +310,15 @@ int main(void)
   accelerometerTaskHandle = osThreadCreate(osThread(accelerometerTask), NULL);
 
   /* definition and creation of temperatureSensorTask */
-  osThreadDef(temperatureSensorTask, startTemperatureSensorTask, osPriorityNormal, 0, 1024);
+  osThreadDef(temperatureSensorTask, startTemperatureSensorTask, osPriorityBelowNormal, 0, 1024);
   temperatureSensorTaskHandle = osThreadCreate(osThread(temperatureSensorTask), NULL);
 
   /* definition and creation of humiditySensorTask */
-  osThreadDef(humiditySensorTask, startHumiditySensorTask, osPriorityNormal, 0, 1024);
+  osThreadDef(humiditySensorTask, startHumiditySensorTask, osPriorityBelowNormal, 0, 1024);
   humiditySensorTaskHandle = osThreadCreate(osThread(humiditySensorTask), NULL);
 
   /* definition and creation of pressureSensorTask */
-  osThreadDef(pressureSensorTask, startPressureSensorTask, osPriorityNormal, 0, 1024);
+  osThreadDef(pressureSensorTask, startPressureSensorTask, osPriorityBelowNormal, 0, 1024);
   pressureSensorTaskHandle = osThreadCreate(osThread(pressureSensorTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -761,9 +775,14 @@ static void MX_GPIO_Init(void)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 	if (GPIO_Pin == USER_BUTTON_PIN) {
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
+
 		printf("Received interrupt from user button \r\n");
 
-		//TODO: release semaphore for the other tasks
+		manager.status = manager.status == RACING ? WAITING_FOR_GREEN_LIGHT : RACING;
+
+		osMutexRelease(managerMutexHandle);
 	}
 }
 
@@ -782,7 +801,29 @@ void startGreenLightTask(void const * argument)
 	/* Infinite loop */
 	for(;;)
 	{
-		BSP_LED_Toggle(LED2);
+		TickType_t initial_time = 0, end_time = 0,diff = 0;
+		initial_time = xTaskGetTickCount();
+
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
+
+		if (manager.status == RACING) {
+
+			//manager.b_green_light--;
+			//osSemaphoreRelease(greenLightSemaphoreHandle);
+			BSP_LED_Toggle(LED2);
+		}
+		//
+		//		else {
+		//
+		//			manager.b_user_button++;
+		//		}
+
+		osMutexRelease(managerMutexHandle);
+		//		osSemaphoreWait(greenLightSemaphoreHandle, MUTEX_WAIT_TIMEOUT);
+
+		end_time= xTaskGetTickCount();
+		diff = end_time - initial_time;
+
 		osDelay(OS_DELAY_STANDARD);
 	}
   /* USER CODE END 5 */
@@ -806,28 +847,52 @@ void startTrackDataPrintTask(void const * argument)
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		//Pressure
+		time_t msec = time(NULL) * 1000;
 
-		int normalized = manager.pressure_value;
-		snprintf(str_prs,100,"Track pressure update: %d mBar \n\r", normalized);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
+		long time_difference = 10000L;
 
-		//Temperature
+		if (manager.track_info_update_timestamp != -1) {
 
-		float temp_value = manager.temperature_value;
-		int tmpInt1 = temp_value;
-		float tmpFrac = temp_value - tmpInt1;
-		int tmpInt2 = trunc(tmpFrac * 100);
-		snprintf(str_tmp,100,"Track temperature update: %d.%02d C\n\r", tmpInt1, tmpInt2);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
+			time_difference = msec - manager.track_info_update_timestamp;
+		}
 
-		//Humidity
+		if (manager.status == RACING && time_difference >= 10000) {
 
-		int hmd = manager.humidity_value;
-		snprintf(str_hmd,100,"Track humidity update: %d %%\n\r", hmd);
-		HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+			//			manager.b_track_data--;
+			//
+			//			osSemaphoreRelease(greenLightSemaphoreHandle);
+
+			//Pressure
+
+			int normalized = manager.pressure_value;
+			snprintf(str_prs,100,"Track pressure update: %d mBar \n\r", normalized);
+			HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
+
+			//Temperature
+
+			float temp_value = manager.temperature_value;
+			int tmpInt1 = temp_value;
+			float tmpFrac = temp_value - tmpInt1;
+			int tmpInt2 = trunc(tmpFrac * 100);
+			snprintf(str_tmp,100,"Track temperature update: %d.%02d C\n\r", tmpInt1, tmpInt2);
+			HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
+
+			//Humidity
+
+			int hmd = manager.humidity_value;
+			snprintf(str_hmd,100,"Track humidity update: %d %%\n\r", hmd);
+			HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+
+			manager.track_info_update_timestamp = msec;
+		}
+
+		//		else {
+		//
+		//			manager.b_track_data++;
+		//		}
 
 		osMutexRelease(managerMutexHandle);
+		//		osSemaphoreWait(trackDataSemaphoreHandle, MUTEX_WAIT_TIMEOUT);
 
 		end_time= xTaskGetTickCount();
 		diff = end_time - initial_time;
@@ -853,14 +918,32 @@ void startUserButtonTask(void const * argument)
 	{
 		TickType_t initial_time = 0, end_time = 0,diff = 0;
 		initial_time = xTaskGetTickCount();
-		//Callback is handled in the HAL_GPIO_EXTI_Callback method
 
-		printf("\033[2J"); //Clears the terminal
+		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		printf("Press the USER button to start the Grand Prix\r\n");
+		if (manager.status == WAITING_FOR_GREEN_LIGHT) {
+			//
+			//			manager.b_user_button--;
+			//			osSemaphoreRelease(userButtonSemaphoreHandle);
+
+			//Callback is handled in the HAL_GPIO_EXTI_Callback method
+
+			//printf("\033[2J"); //Clears the terminal
+
+			printf("Press the USER button to start the Grand Prix\r\n");
+
+		}
+
+		//		else {
+		//
+		//			manager.b_user_button++;
+		//		}
 
 		end_time= xTaskGetTickCount();
 		diff = end_time - initial_time;
+
+		osMutexRelease(managerMutexHandle);
+		//		osSemaphoreWait(trackDataSemaphoreHandle, MUTEX_WAIT_TIMEOUT);
 
 		osDelay(OS_DELAY_STANDARD);
 	}
@@ -882,15 +965,18 @@ void startProximitySensorTask(void const * argument)
 	for(;;)
 	{
 		TickType_t initial_time = 0, end_time = 0,diff = 0;
-	    initial_time = xTaskGetTickCount();
+		initial_time = xTaskGetTickCount();
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		uint16_t proximity_value = 0;
+		if (manager.status == RACING) {
 
-		proximity_value = VL53L0X_PROXIMITY_GetDistance();
+			uint16_t proximity_value = 0;
 
-		manager.proximity = proximity_value;
+			proximity_value = VL53L0X_PROXIMITY_GetDistance();
+
+			manager.proximity = proximity_value;
+		}
 
 		osMutexRelease(managerMutexHandle);
 
@@ -916,12 +1002,15 @@ void startRaceDataPrintTask(void const * argument)
 	for(;;)
 	{
 		TickType_t initial_time = 0, end_time = 0,diff = 0;
-	    initial_time = xTaskGetTickCount();
+		initial_time = xTaskGetTickCount();
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		//		snprintf(str_acc,100, computeCurrentCarPosition(sensors.accelerometer_value.x));
-		//		HAL_UART_Transmit(&huart1,( uint8_t * )str_acc,sizeof(str_acc),100);
+		if (manager.status == RACING) {
+
+			snprintf(str_acc,100, computeCurrentCarPosition(manager.accelerometer_value.x));
+			HAL_UART_Transmit(&huart1,( uint8_t * )str_acc,sizeof(str_acc),100);
+		}
 
 		osMutexRelease(managerMutexHandle);
 
@@ -951,11 +1040,14 @@ void startAccelerometerTask(void const * argument)
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
+		if (manager.status == RACING) {
 
-		BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
+			BSP_MOTION_SENSOR_Axes_t  acc_value = {0, 0, 0};
 
-		manager.accelerometer_value = acc_value;
+			BSP_MOTION_SENSOR_GetAxes(INSTANCE_GYROSCOPE_ACCELEROMETER, MOTION_ACCELERO, &acc_value);
+
+			manager.accelerometer_value = acc_value;
+		}
 
 		osMutexRelease(managerMutexHandle);
 
