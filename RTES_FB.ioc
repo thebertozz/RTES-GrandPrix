@@ -1,8 +1,7 @@
 #MicroXplorer Configuration settings - do not modify
-FREERTOS.BinarySemaphores01=userButtonSemaphore,Dynamic,NULL;trackDataSemaphore,Dynamic,NULL;greenLightSemaphore,Dynamic,NULL;proximitySensorSemaphore,Dynamic,NULL;raceDataSemaphore,Dynamic,NULL;accelerometerSemaphore,Dynamic,NULL;temperatureSensorSemaphore,Dynamic,NULL;humiditySensorSemaphore,Dynamic,NULL;pressureSensorSemaphore,Dynamic,NULL
 FREERTOS.FootprintOK=true
 FREERTOS.INCLUDE_uxTaskGetStackHighWaterMark=1
-FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,configMINIMAL_STACK_SIZE,configMAX_TASK_NAME_LEN,configTOTAL_HEAP_SIZE,configENABLE_FPU,INCLUDE_uxTaskGetStackHighWaterMark,Mutexes01,configUSE_COUNTING_SEMAPHORES,BinarySemaphores01
+FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,configMINIMAL_STACK_SIZE,configMAX_TASK_NAME_LEN,configTOTAL_HEAP_SIZE,configENABLE_FPU,INCLUDE_uxTaskGetStackHighWaterMark,Mutexes01,configUSE_COUNTING_SEMAPHORES
 FREERTOS.Mutexes01=managerMutex,Dynamic,NULL
 FREERTOS.Tasks01=greenLightTask,0,1024,startGreenLightTask,Default,NULL,Dynamic,NULL,NULL;trackDataPrintTask,0,1024,startTrackDataPrintTask,Default,NULL,Dynamic,NULL,NULL;userButtonTask,0,1024,startUserButtonTask,Default,NULL,Dynamic,NULL,NULL;proximitySensorTask,0,1024,startProximitySensorTask,Default,NULL,Dynamic,NULL,NULL;raceDataPrintTask,0,1024,startRaceDataPrintTask,Default,NULL,Dynamic,NULL,NULL;accelerometerTask,0,1024,startAccelerometerTask,Default,NULL,Dynamic,NULL,NULL;temperatureSensorTask,-1,1024,startTemperatureSensorTask,Default,NULL,Dynamic,NULL,NULL;humiditySensorTask,-1,1024,startHumiditySensorTask,Default,NULL,Dynamic,NULL,NULL;pressureSensorTask,-1,1024,startPressureSensorTask,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.configENABLE_FPU=0
