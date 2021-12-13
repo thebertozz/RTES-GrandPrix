@@ -47,6 +47,7 @@
 #define MUTEX_WAIT_TIMEOUT osWaitForever
 #define WAITING_FOR_GREEN_LIGHT 0
 #define RACING 1
+#define PIT_STOP 2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -83,38 +84,11 @@ struct manager_t {
 	uint16_t proximity; //Shared proximity value
 	int status;
 	int b_green_light, b_track_data, b_user_button, b_temperature, b_humidity, b_pressure, b_proximity, b_race_data, b_accelerometer;
-	//int race_executions;
-	//int pit_stop_executions;
-	int waiting_for_input_executions;
-	//int is_waiting_for_race_director_input;
+	int pit_stop_executions;
+	int waiting_for_race_director_executions;
+	int race_executions;
 
 } manager;
-
-//Temperature sensor
-
-char str_tmp[100] = ""; // Formatted message to display the temperature value
-
-//Humidity sensor
-
-char str_hmd[100] = ""; // Formatted message to display the humidity value
-
-//Pressure sensor
-
-char str_prs[100] = ""; // Formatted message to display the temperature value
-
-//Motion sensors
-
-char str_acc[100] = ""; // Formatted message to display the accelerometer value
-
-//Proximity sensor
-
-char str_prx[100] = ""; // Formatted message to display the proximity value
-
-//Track
-
-char str_track[100] = ""; // Formatted message to display the track
-
-int isRacingActivated = 0;
 
 /* USER CODE END PV */
 
@@ -216,10 +190,9 @@ int main(void)
 	manager.b_accelerometer, manager.b_temperature, manager.b_humidity, manager.b_pressure, manager.b_green_light, manager.b_proximity,
 	manager.b_proximity, manager.b_race_data, manager.b_track_data, manager.b_user_button = 0;
 	manager.status = WAITING_FOR_GREEN_LIGHT;
-//	manager.race_executions = 0;
-//	manager.pit_stop_executions = 0;
-//	manager.is_waiting_for_race_director_input = 0;
-	manager.waiting_for_input_executions = 0;
+	manager.pit_stop_executions = 0;
+	manager.waiting_for_race_director_executions = 0;
+	manager.race_executions = 0;
 
   /* USER CODE END 2 */
 
@@ -738,9 +711,28 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		printf("Received interrupt from user button \r\n");
+		if (manager.status == WAITING_FOR_GREEN_LIGHT) {
 
-		manager.status = manager.status == RACING ? WAITING_FOR_GREEN_LIGHT : RACING;
+			manager.status = RACING;
+
+			printf("Green light!\r\n\n");
+
+		} else if (manager.status == RACING) {
+
+			manager.status = PIT_STOP;
+
+			printf("------- PIT STOP -------\r\n\n");
+
+		} else {
+
+			manager.status = WAITING_FOR_GREEN_LIGHT;
+
+			manager.waiting_for_race_director_executions = 0;
+
+			BSP_LED_Off(LED2);
+
+			printf("Retired the car in the pit lane.\r\n\n");
+		}
 
 		osMutexRelease(managerMutexHandle);
 	}
@@ -798,13 +790,15 @@ void startTrackDataPrintTask(void const * argument)
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		if (manager.status == WAITING_FOR_GREEN_LIGHT && manager.temperature_value > 0) {
+		if (manager.status == WAITING_FOR_GREEN_LIGHT
+				&& manager.temperature_value > 0
+				&& manager.waiting_for_race_director_executions % 40 == 0) {
 
 			//Pressure
 
 			int normalized = manager.pressure_value;
-			snprintf(str_prs,100,"Track pressure update: %d mBar \n\r", normalized);
-			HAL_UART_Transmit(&huart1,( uint8_t * )str_prs,sizeof(str_prs),1000);
+
+			printf("Track pressure update: %d mBar \r\n", normalized);
 
 			//Temperature
 
@@ -812,14 +806,14 @@ void startTrackDataPrintTask(void const * argument)
 			int tmpInt1 = temp_value;
 			float tmpFrac = temp_value - tmpInt1;
 			int tmpInt2 = trunc(tmpFrac * 100);
-			snprintf(str_tmp,100,"Track temperature update: %d.%02d C\n\r", tmpInt1, tmpInt2);
-			HAL_UART_Transmit(&huart1,( uint8_t * )str_tmp,sizeof(str_tmp),1000);
+
+			printf("Track temperature update: %d.%02d C\r\n", tmpInt1, tmpInt2);
 
 			//Humidity
 
 			int hmd = manager.humidity_value;
-			snprintf(str_hmd,100,"Track humidity update: %d %%\n\r", hmd);
-			HAL_UART_Transmit(&huart1,( uint8_t * )str_hmd,sizeof(str_hmd),1000);
+
+			printf("Track humidity update: %d %%\r\n\n", hmd);
 		}
 
 		osMutexRelease(managerMutexHandle);
@@ -851,14 +845,21 @@ void startUserButtonTask(void const * argument)
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		if (manager.status == WAITING_FOR_GREEN_LIGHT) {
+		if (manager.status == WAITING_FOR_GREEN_LIGHT && manager.waiting_for_race_director_executions % 20 == 0) {
 
 			//Callback is handled in the HAL_GPIO_EXTI_Callback method
 
 			//printf("\033[2J"); //Clears the terminal
 
-			printf("Press the USER button to start the Grand Prix...\r\n");
+			printf("Press the USER button to start the Grand Prix...\r\n\n");
+
+			if (manager.waiting_for_race_director_executions == 1000) {
+
+				manager.waiting_for_race_director_executions = 0;
+			}
 		}
+
+		manager.waiting_for_race_director_executions++;
 
 		end_time= xTaskGetTickCount();
 		diff = end_time - initial_time;
@@ -889,7 +890,7 @@ void startProximitySensorTask(void const * argument)
 
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		if (manager.status == RACING) {
+		if (manager.status != WAITING_FOR_GREEN_LIGHT) {
 
 			uint16_t proximity_value = 0;
 
@@ -928,11 +929,43 @@ void startRaceDataPrintTask(void const * argument)
 
 		if (manager.status == RACING) {
 
-			snprintf(str_acc,100, computeCurrentCarPosition(manager.accelerometer_value.x));
-			HAL_UART_Transmit(&huart1,( uint8_t * )str_acc,sizeof(str_acc),100);
-		}
+			printf(computeCurrentCarPosition(manager.accelerometer_value.x));
 
-		//manager.race_executions++;
+			manager.race_executions++;
+
+			if (manager.race_executions == 100) {
+
+				printf("Race has ended.\r\n\n");
+
+				manager.race_executions = 0;
+
+				manager.status = WAITING_FOR_GREEN_LIGHT;
+			}
+
+		} else if (manager.status == PIT_STOP) {
+
+			if (manager.proximity > 100 && manager.proximity < 200) {
+
+				printf("Hold steady...!\r\n\n");
+
+				printf(performPitStop());
+
+				manager.pit_stop_executions++;
+
+			} else {
+
+				printf("Keep your hands on the wheel!\r\n\n");
+			}
+
+			if (manager.pit_stop_executions == 20) {
+
+				manager.pit_stop_executions = 0 ;
+
+				manager.status = RACING;
+
+				printf("GO GO GO!\r\n\n");
+			}
+		}
 
 		osMutexRelease(managerMutexHandle);
 

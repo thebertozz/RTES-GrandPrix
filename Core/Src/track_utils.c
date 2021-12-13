@@ -120,5 +120,12 @@ char* computeCurrentCarPosition(int32_t x_axis) {
 
 		return "";
 	}
+}
 
+char* performPitStop() {
+
+	return PIT_LANE
+			"|                    ||  *  |\r\n"
+			PIT_LANE
+			"\n";
 }
