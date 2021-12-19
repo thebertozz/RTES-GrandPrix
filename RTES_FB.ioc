@@ -1,9 +1,11 @@
 #MicroXplorer Configuration settings - do not modify
+FREERTOS.BinarySemaphores01=userButtonInterruptSemaphore,Dynamic,NULL
 FREERTOS.FootprintOK=true
 FREERTOS.INCLUDE_uxTaskGetStackHighWaterMark=1
-FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,configMINIMAL_STACK_SIZE,configMAX_TASK_NAME_LEN,configTOTAL_HEAP_SIZE,configENABLE_FPU,INCLUDE_uxTaskGetStackHighWaterMark,Mutexes01,configUSE_COUNTING_SEMAPHORES
+FREERTOS.INCLUDE_vTaskDelayUntil=1
+FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,configMINIMAL_STACK_SIZE,configMAX_TASK_NAME_LEN,configTOTAL_HEAP_SIZE,configENABLE_FPU,INCLUDE_uxTaskGetStackHighWaterMark,Mutexes01,configUSE_COUNTING_SEMAPHORES,INCLUDE_vTaskDelayUntil,BinarySemaphores01
 FREERTOS.Mutexes01=managerMutex,Dynamic,NULL
-FREERTOS.Tasks01=greenLightTask,0,1024,startGreenLightTask,Default,NULL,Dynamic,NULL,NULL;trackDataPrintTask,0,1024,startTrackDataPrintTask,Default,NULL,Dynamic,NULL,NULL;userButtonTask,0,1024,startUserButtonTask,Default,NULL,Dynamic,NULL,NULL;proximitySensorTask,0,1024,startProximitySensorTask,Default,NULL,Dynamic,NULL,NULL;raceDataPrintTask,0,1024,startRaceDataPrintTask,Default,NULL,Dynamic,NULL,NULL;accelerometerTask,0,1024,startAccelerometerTask,Default,NULL,Dynamic,NULL,NULL;temperatureSensorTask,-1,1024,startTemperatureSensorTask,Default,NULL,Dynamic,NULL,NULL;humiditySensorTask,-1,1024,startHumiditySensorTask,Default,NULL,Dynamic,NULL,NULL;pressureSensorTask,-1,1024,startPressureSensorTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.Tasks01=greenLightTask,0,1024,startGreenLightTask,Default,NULL,Dynamic,NULL,NULL;trackDataPrintTask,0,1024,startTrackDataPrintTask,Default,NULL,Dynamic,NULL,NULL;userButtonTask,0,1024,startUserButtonTask,Default,NULL,Dynamic,NULL,NULL;proximitySensorTask,0,1024,startProximitySensorTask,Default,NULL,Dynamic,NULL,NULL;raceDataPrintTask,0,1024,startRaceDataPrintTask,Default,NULL,Dynamic,NULL,NULL;accelerometerTask,0,1024,startAccelerometerTask,Default,NULL,Dynamic,NULL,NULL;temperatureSensorTask,-1,1024,startTemperatureSensorTask,Default,NULL,Dynamic,NULL,NULL;humiditySensorTask,-1,1024,startHumiditySensorTask,Default,NULL,Dynamic,NULL,NULL;pressureSensorTask,-1,1024,startPressureSensorTask,Default,NULL,Dynamic,NULL,NULL;buttonInterruptTask,0,1024,startButtonInterruptTask,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.configENABLE_FPU=0
 FREERTOS.configMAX_TASK_NAME_LEN=32
 FREERTOS.configMINIMAL_STACK_SIZE=128
@@ -484,7 +486,7 @@ ProjectManager.FreePins=false
 ProjectManager.HalAssertFull=false
 ProjectManager.HeapSize=0x200
 ProjectManager.KeepUserCode=true
-ProjectManager.LastFirmware=true
+ProjectManager.LastFirmware=false
 ProjectManager.LibraryCopy=1
 ProjectManager.MainLocation=Core/Src
 ProjectManager.NoMain=false

@@ -88,15 +88,15 @@ char* performPitStop() {
 
 char* computeTrackOpponent(u_int8_t position) {
 
-	if (position < 4) {
+	if (position <= 4) {
 
 		return"|  x             |\r\n";
 
-	} else if (position > 4 && position < 8) {
+	} else if (position > 4 && position <= 8) {
 
 		return"|     x          |\r\n";
 
-	} else if (position > 8 && position < 12) {
+	} else if (position > 8 && position <= 12) {
 
 		return"|          x     |\r\n";
 
