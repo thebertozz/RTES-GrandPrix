@@ -87,6 +87,8 @@ struct manager_t {
 	int pit_stop_executions;
 	int waiting_for_race_director_executions;
 	int race_executions;
+	int opponent_executions;
+	int last_opponent_value;
 
 } manager;
 
@@ -193,6 +195,8 @@ int main(void)
 	manager.pit_stop_executions = 0;
 	manager.waiting_for_race_director_executions = 0;
 	manager.race_executions = 0;
+	manager.last_opponent_value = -1;
+	manager.opponent_executions = 0;
 
   /* USER CODE END 2 */
 
@@ -928,6 +932,49 @@ void startRaceDataPrintTask(void const * argument)
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
 		if (manager.status == RACING) {
+
+			printf("\033[2J"); //Clears the terminal
+
+			if (manager.race_executions % 10 == 0 || manager.last_opponent_value != -1) {
+
+				if (manager.opponent_executions < 7) {
+
+					manager.last_opponent_value = manager.last_opponent_value != -1 ? manager.last_opponent_value : rand() % 16;
+
+					manager.opponent_executions++;
+
+					for (int i = 0; i < 7; i++) {
+
+						if (i == manager.opponent_executions) {
+
+							printf(computeTrackOpponent(manager.last_opponent_value));
+
+						} else {
+
+							printf(getClearTrackString());
+						}
+					}
+
+				} else {
+
+					manager.last_opponent_value = -1;
+					manager.opponent_executions = 0;
+
+					for (int i = 0; i < 7; i++) {
+
+					  printf(getClearTrackString());
+					}
+				}
+
+			} else {
+
+				for (int i = 0; i < 7; i++) {
+
+					printf(getClearTrackString());
+				}
+
+				manager.last_opponent_value = -1;
+			}
 
 			printf(computeCurrentCarPosition(manager.accelerometer_value.x));
 

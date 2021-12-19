@@ -1,2 +1,4 @@
 track_utils.c:3:7:computeCurrentCarPosition	24	static
-track_utils.c:125:7:performPitStop	4	static
+track_utils.c:81:7:performPitStop	4	static
+track_utils.c:89:7:computeTrackOpponent	16	static
+track_utils.c:113:7:getClearTrackString	4	static
