@@ -43,7 +43,7 @@
 /* USER CODE BEGIN PD */
 #define INSTANCE_GYROSCOPE_ACCELEROMETER 0
 #define INSTANCE_MAGNETOMETER 1
-#define OS_DELAY_STANDARD 400
+#define OS_DELAY_STANDARD 300
 #define MUTEX_WAIT_TIMEOUT osWaitForever
 #define WAITING_FOR_GREEN_LIGHT 0
 #define RACING 1
@@ -972,9 +972,9 @@ void startRaceDataPrintTask(void const * argument)
 
 			manager.race_executions++;
 
-			if (manager.race_executions == 200) {
+			if (manager.race_executions == 150) {
 
-				printf("Race has ended.\r\n\n");
+				printf("Chequered flag, good job!\r\n\n");
 
 				manager.race_executions = 0;
 
@@ -1160,6 +1160,10 @@ void startPressureSensorTask(void const * argument)
 void startButtonInterruptTask(void const * argument)
 {
 	/* USER CODE BEGIN startButtonInterruptTask */
+
+	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
+	last_tick_time = xTaskGetTickCount();
+
 	/* Infinite loop */
 	for(;;)
 	{
@@ -1191,6 +1195,8 @@ void startButtonInterruptTask(void const * argument)
 		}
 
 		osMutexRelease(managerMutexHandle);
+
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
 	}
 	/* USER CODE END startButtonInterruptTask */
 }

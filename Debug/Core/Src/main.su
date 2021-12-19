@@ -16,6 +16,6 @@ main.c:1026:6:startAccelerometerTask	56	static
 main.c:1067:6:startTemperatureSensorTask	32	static
 main.c:1098:6:startHumiditySensorTask	32	static
 main.c:1129:6:startPressureSensorTask	32	static
-main.c:1160:6:startButtonInterruptTask	16	static
-main.c:1206:6:HAL_TIM_PeriodElapsedCallback	16	static
-main.c:1223:6:Error_Handler	4	static,ignoring_inline_asm
+main.c:1160:6:startButtonInterruptTask	32	static
+main.c:1212:6:HAL_TIM_PeriodElapsedCallback	16	static
+main.c:1229:6:Error_Handler	4	static,ignoring_inline_asm
