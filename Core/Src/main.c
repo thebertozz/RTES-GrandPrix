@@ -79,7 +79,7 @@ osSemaphoreId userButtonInterruptSemaphoreHandle;
 
 struct manager_t {
 
-	int temperature_value;  // Shared measured temperature value
+	float temperature_value;  // Shared measured temperature value
 	uint8_t humidity_value; // Shared measured humidity value
 	int pressure_value;  // Shared measured pressure value
 	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
@@ -236,7 +236,7 @@ int main(void)
   greenLightTaskHandle = osThreadCreate(osThread(greenLightTask), NULL);
 
   /* definition and creation of trackDataPrintTask */
-  osThreadDef(trackDataPrintTask, startTrackDataPrintTask, osPriorityNormal, 0, 160);
+  osThreadDef(trackDataPrintTask, startTrackDataPrintTask, osPriorityNormal, 0, 192);
   trackDataPrintTaskHandle = osThreadCreate(osThread(trackDataPrintTask), NULL);
 
   /* definition and creation of userButtonTask */
@@ -754,7 +754,7 @@ void startGreenLightTask(void const * argument)
 	{
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		if (manager.status == RACING) {
+		if (manager.status != WAITING_FOR_GREEN_LIGHT) {
 			BSP_LED_Toggle(LED2);
 		}
 
@@ -803,10 +803,10 @@ void startTrackDataPrintTask(void const * argument)
 
 			//Temperature
 
-			int temp_value = manager.temperature_value;
+			float temp_value = manager.temperature_value;
 			int tmpInt1 = temp_value;
-			int tmpFrac = temp_value - tmpInt1;
-			int tmpInt2 = trunc(tmpFrac * 100);
+			float tmpFraction = temp_value - tmpInt1;
+			int tmpInt2 = trunc(tmpFraction * 100);
 
 			printf("Track temperature update: %d.%02d C\r\n", tmpInt1, tmpInt2);
 
@@ -819,7 +819,7 @@ void startTrackDataPrintTask(void const * argument)
 
 		uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
 
-		//printf("track data task watermark %lu \r\n", uxHighWaterMark);
+		printf("track data task watermark %lu \r\n", uxHighWaterMark);
 
 		osMutexRelease(managerMutexHandle);
 
@@ -855,11 +855,9 @@ void startUserButtonTask(void const * argument)
 
 			//Callback is handled in the HAL_GPIO_EXTI_Callback method
 
-			//printf("\033[2J"); //Clears the terminal
-
 			printf("Press the USER button to start the Grand Prix...\r\n\n");
 
-			if (manager.waiting_for_race_director_executions == 1000) {
+			if (manager.waiting_for_race_director_executions == 200) {
 
 				manager.waiting_for_race_director_executions = 0;
 			}
@@ -1107,7 +1105,7 @@ void startTemperatureSensorTask(void const * argument)
 
 		uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
 
-		//printf("temperature task watermark %lu \r\n", uxHighWaterMark);
+		printf("temperature task watermark %lu \r\n", uxHighWaterMark);
 
 		osMutexRelease(managerMutexHandle);
 
