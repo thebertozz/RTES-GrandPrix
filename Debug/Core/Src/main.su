@@ -10,8 +10,8 @@ main.c:725:6:HAL_GPIO_EXTI_Callback	16	static
 main.c:742:6:startGreenLightTask	32	static
 main.c:779:6:startTrackDataPrintTask	56	static
 main.c:839:6:startUserButtonTask	32	static
-main.c:886:6:startProximitySensorTask	40	static
-main.c:928:6:startRaceDataPrintTask	40	static
+main.c:886:6:startProximitySensorTask	32	static
+main.c:928:6:startRaceDataPrintTask	32	static
 main.c:1044:6:startAccelerometerTask	56	static
 main.c:1089:6:startTemperatureSensorTask	32	static
 main.c:1124:6:startHumiditySensorTask	32	static
