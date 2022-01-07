@@ -79,11 +79,11 @@ osSemaphoreId userButtonInterruptSemaphoreHandle;
 
 struct manager_t {
 
-	float temperature_value;  // Shared measured temperature value
-	uint8_t humidity_value; // Shared measured humidity value
-	int pressure_value;  // Shared measured pressure value
-	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
-	uint16_t proximity; //Shared proximity value
+	float temperature_value;
+	uint8_t humidity_value;
+	int pressure_value;
+	BSP_MOTION_SENSOR_Axes_t  accelerometer_value;
+	uint16_t proximity;
 	uint8_t status;
 	uint8_t pit_stop_executions;
 	uint8_t waiting_for_race_director_executions;
@@ -721,6 +721,8 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
+	//Questa è la callback che gestisce la pressione del pulsante USER
+
 	if (GPIO_Pin == USER_BUTTON_PIN) {
 
 		osSemaphoreRelease(userButtonInterruptSemaphoreHandle);
@@ -739,6 +741,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 void startGreenLightTask(void const * argument)
 {
 	/* USER CODE BEGIN 5 */
+
+	//Questo è il task che gestisce il LED 2 quando la gara è in corso, facendolo lampeggiare ogni OS_DELAY_STANDARD ms
 
 	TickType_t last_tick_time = xTaskGetTickCount();
 
@@ -768,6 +772,9 @@ void startGreenLightTask(void const * argument)
 void startTrackDataPrintTask(void const * argument)
 {
 	/* USER CODE BEGIN startTrackDataPrintTask */
+
+	//Questo è il task che gestisce la stampa dei dati relativi alla pista, ovvero la temperatura, l'umidità e la pressione
+	//I dati vengono stampati ogni 40 esecuzioni del task che stampa l'informazione di inizio gara
 
 	TickType_t last_tick_time = xTaskGetTickCount();
 
@@ -821,6 +828,10 @@ void startUserButtonTask(void const * argument)
 {
 	/* USER CODE BEGIN startUserButtonTask */
 
+	//Questo è il task che indica all'utente che per iniziare la gara deve premere il pulsante USER sulla scheda
+	//La pressione del tasto è gestita tramite un semaforo binario ed è intercettata tramite la callback HAL_GPIO_EXTI_Callback
+	//La logica dopo l'avvenuta pressione del tasto è gestita anch'essa in un task chiamato startButtonInterruptTask
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -860,6 +871,9 @@ void startProximitySensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startProximitySensorTask */
 
+	//Questo task ha il compito di recuperare l'informazione aggiornata sul sensore di prossimità
+	//se si è in modalità PIT STOP
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -867,7 +881,7 @@ void startProximitySensorTask(void const * argument)
 	{
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		if (manager.status != WAITING_FOR_GREEN_LIGHT) {
+		if (manager.status == PIT_STOP) {
 
 			uint8_t proximity_value = 0;
 
@@ -894,6 +908,10 @@ void startRaceDataPrintTask(void const * argument)
 {
 	/* USER CODE BEGIN startRaceDataPrintTask */
 
+	//Questo task stampa la pista, gli avversari, la posizione attuale dell'auto
+	//In caso di PIT stop stampa i dati relativi
+	//In caso di gara terminata, stampa il relativo messaggio
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -903,7 +921,7 @@ void startRaceDataPrintTask(void const * argument)
 
 		if (manager.status == RACING) {
 
-			printf("\033[2J"); //Clears the terminal
+			printf("\033[2J"); //Pulisce il terminale
 
 			if (manager.race_executions % 10 == 0 || manager.last_opponent_value != -1) {
 
@@ -1004,6 +1022,8 @@ void startAccelerometerTask(void const * argument)
 {
 	/* USER CODE BEGIN startAccelerometerTask */
 
+	//Questo task aggiorna le informazioni ricevute dall'accelerometro se la gara è in corso
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -1038,6 +1058,8 @@ void startTemperatureSensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startTemperatureSensorTask */
 
+	//Questo task aggiorna le informazioni relative alla temperatura della pista se si è in attesa della partenza
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -1045,7 +1067,10 @@ void startTemperatureSensorTask(void const * argument)
 	{
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		manager.temperature_value = BSP_TSENSOR_ReadTemp();
+		if (manager.status == WAITING_FOR_GREEN_LIGHT) {
+
+			manager.temperature_value = BSP_TSENSOR_ReadTemp();
+		}
 
 		osMutexRelease(managerMutexHandle);
 
@@ -1065,6 +1090,8 @@ void startHumiditySensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startHumiditySensorTask */
 
+	//Questo task aggiorna le informazioni relative all'umidità della pista se si è in attesa della partenza
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -1072,7 +1099,10 @@ void startHumiditySensorTask(void const * argument)
 	{
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		manager.humidity_value = BSP_HSENSOR_ReadHumidity();
+		if (manager.status == WAITING_FOR_GREEN_LIGHT) {
+
+			manager.humidity_value = BSP_HSENSOR_ReadHumidity();
+		}
 
 		osMutexRelease(managerMutexHandle);
 
@@ -1092,6 +1122,8 @@ void startPressureSensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startPressureSensorTask */
 
+	//Questo task aggiorna le informazioni relative alla pressione della pista se si è in attesa della partenza
+
 	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
@@ -1099,7 +1131,10 @@ void startPressureSensorTask(void const * argument)
 	{
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
-		manager.pressure_value = BSP_PSENSOR_ReadPressure();
+		if (manager.status == WAITING_FOR_GREEN_LIGHT) {
+
+			manager.pressure_value = BSP_PSENSOR_ReadPressure();
+		}
 
 		osMutexRelease(managerMutexHandle);
 
@@ -1118,6 +1153,8 @@ void startPressureSensorTask(void const * argument)
 void startButtonInterruptTask(void const * argument)
 {
 	/* USER CODE BEGIN startButtonInterruptTask */
+
+	//Questo task gestisce il semaforo rilasciato alla pressione del pulsante USER e gestisce lo stato della gara
 
 	TickType_t last_tick_time = xTaskGetTickCount();
 
