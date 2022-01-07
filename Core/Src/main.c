@@ -85,7 +85,6 @@ struct manager_t {
 	BSP_MOTION_SENSOR_Axes_t  accelerometer_value; //Shared accelerometer value
 	uint16_t proximity; //Shared proximity value
 	uint8_t status;
-	uint8_t b_green_light, b_track_data, b_user_button, b_temperature, b_humidity, b_pressure, b_proximity, b_race_data, b_accelerometer;
 	uint8_t pit_stop_executions;
 	uint8_t waiting_for_race_director_executions;
 	uint8_t race_executions;
@@ -192,8 +191,6 @@ int main(void)
 	manager.pressure_value = 0;
 	manager.temperature_value = 0;
 	manager.proximity = 0;
-	manager.b_accelerometer, manager.b_temperature, manager.b_humidity, manager.b_pressure, manager.b_green_light, manager.b_proximity,
-	manager.b_proximity, manager.b_race_data, manager.b_track_data, manager.b_user_button = 0;
 	manager.status = WAITING_FOR_GREEN_LIGHT;
 	manager.pit_stop_executions = 0;
 	manager.waiting_for_race_director_executions = 0;
@@ -743,11 +740,7 @@ void startGreenLightTask(void const * argument)
 {
 	/* USER CODE BEGIN 5 */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -758,13 +751,9 @@ void startGreenLightTask(void const * argument)
 			BSP_LED_Toggle(LED2);
 		}
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("green light task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END 5 */
 }
@@ -780,11 +769,7 @@ void startTrackDataPrintTask(void const * argument)
 {
 	/* USER CODE BEGIN startTrackDataPrintTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -817,13 +802,9 @@ void startTrackDataPrintTask(void const * argument)
 			printf("Track humidity update: %d %%\r\n\n", hmd);
 		}
 
-		//		uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-		//
-		//		printf("track data task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 
 	}
 	/* USER CODE END startTrackDataPrintTask */
@@ -840,11 +821,7 @@ void startUserButtonTask(void const * argument)
 {
 	/* USER CODE BEGIN startUserButtonTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -865,13 +842,9 @@ void startUserButtonTask(void const * argument)
 
 		manager.waiting_for_race_director_executions++;
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("user button task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startUserButtonTask */
 }
@@ -887,11 +860,7 @@ void startProximitySensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startProximitySensorTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -907,13 +876,9 @@ void startProximitySensorTask(void const * argument)
 			manager.proximity = proximity_value;
 		}
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("proximity sensor task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startProximitySensorTask */
 }
@@ -929,11 +894,7 @@ void startRaceDataPrintTask(void const * argument)
 {
 	/* USER CODE BEGIN startRaceDataPrintTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -996,6 +957,8 @@ void startRaceDataPrintTask(void const * argument)
 				manager.race_executions = 0;
 
 				manager.status = WAITING_FOR_GREEN_LIGHT;
+
+				BSP_LED_Off(LED2);
 			}
 
 		} else if (manager.status == PIT_STOP) {
@@ -1023,13 +986,9 @@ void startRaceDataPrintTask(void const * argument)
 			}
 		}
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("race data task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startRaceDataPrintTask */
 }
@@ -1045,18 +1004,11 @@ void startAccelerometerTask(void const * argument)
 {
 	/* USER CODE BEGIN startAccelerometerTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
 	{
-		TickType_t initial_time = 0, end_time = 0,diff = 0;
-		initial_time = xTaskGetTickCount();
-
 		osMutexWait(managerMutexHandle, MUTEX_WAIT_TIMEOUT);
 
 		if (manager.status == RACING) {
@@ -1068,13 +1020,9 @@ void startAccelerometerTask(void const * argument)
 			manager.accelerometer_value = acc_value;
 		}
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("accelerometer task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startAccelerometerTask */
 }
@@ -1090,11 +1038,7 @@ void startTemperatureSensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startTemperatureSensorTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -1103,13 +1047,9 @@ void startTemperatureSensorTask(void const * argument)
 
 		manager.temperature_value = BSP_TSENSOR_ReadTemp();
 
-		//		uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-		//
-		//		printf("temperature task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startTemperatureSensorTask */
 }
@@ -1125,11 +1065,7 @@ void startHumiditySensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startHumiditySensorTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -1138,13 +1074,9 @@ void startHumiditySensorTask(void const * argument)
 
 		manager.humidity_value = BSP_HSENSOR_ReadHumidity();
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("humidity task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startHumiditySensorTask */
 }
@@ -1160,11 +1092,7 @@ void startPressureSensorTask(void const * argument)
 {
 	/* USER CODE BEGIN startPressureSensorTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -1173,13 +1101,9 @@ void startPressureSensorTask(void const * argument)
 
 		manager.pressure_value = BSP_PSENSOR_ReadPressure();
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("pressure task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startPressureSensorTask */
 }
@@ -1195,11 +1119,7 @@ void startButtonInterruptTask(void const * argument)
 {
 	/* USER CODE BEGIN startButtonInterruptTask */
 
-	//	UBaseType_t uxHighWaterMark;
-	//	uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-	TickType_t last_tick_time = 0, end_time = 0,diff = 0;
-	last_tick_time = xTaskGetTickCount();
+	TickType_t last_tick_time = xTaskGetTickCount();
 
 	/* Infinite loop */
 	for(;;)
@@ -1231,13 +1151,9 @@ void startButtonInterruptTask(void const * argument)
 			printf("We need to retire the car! Sorry.\r\n\n");
 		}
 
-		//uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-
-		//printf("button interrupt task watermark %lu \r\n", uxHighWaterMark);
-
 		osMutexRelease(managerMutexHandle);
 
-		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD / portTICK_PERIOD_MS);
+		osDelayUntil(&last_tick_time, OS_DELAY_STANDARD);
 	}
 	/* USER CODE END startButtonInterruptTask */
 }
